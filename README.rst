@@ -50,7 +50,7 @@ Getting Started
 
     $ git clone https://gitlab.com/Olllom/rickflow.git
 
-5) Install
+5) Install::
 
     $ cd rickflow
     $ python setup.py install
@@ -59,7 +59,9 @@ Getting Started
 
 .. _examples: examples/
 
-* Counting Crossings: examples/counting_crossings.ipynb
+* `Counting Crossings`_
+
+.. _Counting Crossings:examples/counting_crossings.ipynb
 
 
 Credits
