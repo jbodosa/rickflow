@@ -385,16 +385,3 @@ def iterload(start_sequence=1, end_sequence=None, top=None,
             yield frame, values
 
 
-if __name__ == "__main__":
-    try:
-        submit_script = sys.argv[1]
-    except IndexError:
-        print("Usage ./rickflow.py SUBMIT_SCRIPT")
-        sys.exit(1)
-    assert os.path.isfile(submit_script)
-
-    if not os.path.isdir("out"):
-        os.mkdir("out")
-    cwd = os.path.basename(os.getcwd())
-    os.system("sbatch -o {}-%j.log -J {} {}".format(cwd, cwd, submit_script))
-

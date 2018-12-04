@@ -1,38 +1,43 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for `rickflow` package."""
+"""Tests for `rickflow` module."""
 
 import pytest
 
-from click.testing import CliRunner
-
-from rickflow import rickflow
-from rickflow import cli
-
-
-@pytest.fixture
-def response():
-    """Sample pytest fixture.
-
-    See more at: http://doc.pytest.org/en/latest/fixture.html
-    """
-    # import requests
-    # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
+from rickflow import RickFlow
+import glob
+import os
+import pytest
 
 
-def test_content(response):
-    """Sample pytest test function with the pytest fixture as an argument."""
-    # from bs4 import BeautifulSoup
-    # assert 'GitHub' in BeautifulSoup(response.content).title.string
+class CWD(object):
+    def __init__(self, path): self.old_path = os.getcwd(); self.new_path = str(path)
+    def __enter__(self): os.chdir(self.new_path); return self
+    def __exit__(self): os.chdir(self.old_path)
 
 
-def test_command_line_interface():
-    """Test the CLI."""
-    runner = CliRunner()
-    result = runner.invoke(cli.main)
-    assert result.exit_code == 0
-    assert 'rickflow.cli.main' in result.output
-    help_result = runner.invoke(cli.main, ['--help'])
-    assert help_result.exit_code == 0
-    assert '--help  Show this message and exit.' in help_result.output
+@pytest.fixture(scope="module")
+def rickflow_instance():
+    return RickFlow(
+        toppar=glob.glob("./toppar/*"),
+        psf="2dlpc.psf",
+        crd="rb2dlpc.crd",
+        box_dimensions=[47.7695166, 47.7695166, 137.142387],
+        gpu_id=None
+    )
+
+
+def test_directory_structure(rickflow_instance):
+    assert os.path.exists("out")
+    assert os.path.exists("trj")
+    assert os.path.exists("res")
+
+
+def test_forces(rickflow_instance):
+    for force in rickflow_instance.system.getForces():
+        if hasattr(force, "getUseDispersionCorrection"):
+            assert force.getUseDispersionCorrection() is False
+        if hasattr(force, "getUseLongRangeCorrection"):
+            assert force.getUseLongRangeCorrection() is False
+
