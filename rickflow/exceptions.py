@@ -1,0 +1,26 @@
+# -*- coding: utf-8 -*-
+
+"""
+Exceptions for rickflow package
+"""
+
+
+class RickFlowException(Exception):
+    pass
+
+
+class LastSequenceReached(RickFlowException):
+    def __init__(self, last_seqno):
+        super(LastSequenceReached, self).__init__(
+            "Last sequence {} reached. Quitting.".format(last_seqno)
+        )
+
+
+class NoCuda(RickFlowException):
+    def __init__(self, exc):
+        super(RickFlowException, self).__init__(
+            "Cuda was required, but could not be used on the current node. "
+            "Make sure that you have loaded the cuda module and that this "
+            "script is running on a GPU node."
+            "Details: {}".format(exc)
+        )
