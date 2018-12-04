@@ -6,7 +6,7 @@
 import pytest
 
 from rflow import RickFlow
-from rflow.tools import abspath
+from rflow.utility import abspath
 import glob
 import os
 import pytest

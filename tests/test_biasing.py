@@ -4,7 +4,7 @@ Tests for biasing tools.
 
 from rflow import biasing
 from rflow.biasing import FreeEnergyCosineSeries, extract_z_histogram
-from rflow.tools import abspath
+from rflow.utility import abspath
 
 from pytest import approx
 

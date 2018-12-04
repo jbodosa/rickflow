@@ -28,3 +28,20 @@ class CWD(object):
             return False # uncomment to pass exception through
 
         return True
+
+
+def selection(trajectory, sel):
+    """
+    A short helper function to enable selection via atom ids or selection strings.
+
+    Args:
+        trajectory: A mdtraj trajectory.
+        sel: Either a selection string or a list of atom ids.
+
+    Returns:
+        list of int: Selected atom ids.
+    """
+    if isinstance(sel, list):
+        return list
+    else:
+        return trajectory.topology.select(sel)
