@@ -6,32 +6,28 @@
 import pytest
 
 from rickflow import RickFlow
+from rickflow.tools import abspath
 import glob
 import os
 import pytest
 
 
-class CWD(object):
-    def __init__(self, path): self.old_path = os.getcwd(); self.new_path = str(path)
-    def __enter__(self): os.chdir(self.new_path); return self
-    def __exit__(self): os.chdir(self.old_path)
-
-
 @pytest.fixture(scope="module")
-def rickflow_instance():
+def rickflow_instance(tmpdir_factory):
     return RickFlow(
-        toppar=glob.glob("./toppar/*"),
-        psf="2dlpc.psf",
-        crd="rb2dlpc.crd",
+        toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
+        psf=abspath("data/2dlpc.psf"),
+        crd=abspath("data/rb2dlpc.crd"),
         box_dimensions=[47.7695166, 47.7695166, 137.142387],
-        gpu_id=None
+        gpu_id=None,
+        work_dir=str(tmpdir_factory.mktemp('rflow'))
     )
 
 
 def test_directory_structure(rickflow_instance):
-    assert os.path.exists("out")
-    assert os.path.exists("trj")
-    assert os.path.exists("res")
+    assert os.path.exists(os.path.join(rickflow_instance.work_dir, "out"))
+    assert os.path.exists(os.path.join(rickflow_instance.work_dir, "trj"))
+    assert os.path.exists(os.path.join(rickflow_instance.work_dir, "res"))
 
 
 def test_forces(rickflow_instance):

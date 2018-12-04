@@ -4,18 +4,18 @@ Tests for biasing tools.
 
 from rickflow import biasing
 from rickflow.biasing import FreeEnergyCosineSeries, extract_z_histogram
+from rickflow.tools import abspath
 
 from pytest import approx
 
+import os
 import random
 import numpy as np
 
-from matplotlib import pyplot as plt
-
-from openmmtools.integrators import MetropolisMonteCarloIntegrator
 from simtk.openmm import System, Context, LangevinIntegrator
 from simtk.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
 from simtk import unit as u
+
 
 
 def get_custom_force_classes():
@@ -32,7 +32,7 @@ def test_cos_series_with_floats():
     """
     Test usage of cosine series with unitless quantities.
     """
-    densities = np.loadtxt("density_whex.txt")
+    densities = np.loadtxt(abspath("data/density_whex.txt"))
     densities[0, 1] = densities[1, 1]
     densities[-1, 1] = densities[-2, 1]
     box_height = abs(2 * densities[0, 0])
@@ -103,7 +103,7 @@ def test_all_openmm_forces():
 #    fe_series = FreeEnergyCosineSeries.from_free_energy()
 
 
-def test_extract_z_histogram():
+def test_extract_z_histogram(tmpdir):
 
     #for use_cv_force in [False, True]:
     #for force_mode in ["per_atom", "collective_variable", "virtual_site"]:
@@ -162,16 +162,16 @@ def test_extract_z_histogram():
             context.setPositions(u.Quantity(value=np.array(positions),
                                             unit=u.angstrom))
             context.applyConstraints(0.001)
-            pdb = PDBReporter("out.pdb", 1)
+            pdb = PDBReporter(os.path.join(str(tmpdir),"out.pdb"), 1)
             pdb.report(simulation, context.getState(getPositions=True))
             print("run 1000")
             simulation.step(1000)
-            simulation.reporters.append(DCDReporter("out.dcd", 100, enforcePeriodicBox=True))
+            simulation.reporters.append(DCDReporter(os.path.join(str(tmpdir),"out.dcd"), 100, enforcePeriodicBox=True))
             print("run 10000")
             simulation.step(10000)
             #assert False
 
-        histogram = extract_z_histogram(["out.dcd"], topology,
+        histogram = extract_z_histogram([os.path.join(str(tmpdir),"out.dcd")], topology,
                                         particle_ids=list(range(n_particles)),
                                         num_bins=10)
         free_energy = - u.MOLAR_GAS_CONSTANT_R * 310.0 * u.kelvin * np.log(histogram[0])

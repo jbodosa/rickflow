@@ -5,15 +5,13 @@ Translating Rick Venable's simulation workflow from CHARMM to OpenMM.
 """
 
 import os
-import sys
 import glob
 import numpy as np
 
 import simtk.unit as u
-from simtk.openmm import Platform, MonteCarloMembraneBarostat
-from simtk.openmm import DrudeLangevinIntegrator
+from simtk.openmm import Platform
 from simtk.openmm import CustomNonbondedForce, NonbondedForce
-from simtk.openmm.app import ForceField, Simulation
+from simtk.openmm.app import Simulation
 from simtk.openmm.app import CharmmPsfFile, CharmmParameterSet, CharmmCrdFile
 from simtk.openmm.app import LJPME, PME, HBonds
 from simtk.openmm.app import DCDReporter, StateDataReporter, PDBReporter
@@ -21,9 +19,10 @@ from simtk.openmm.app import DCDReporter, StateDataReporter, PDBReporter
 import mdtraj as md
 
 from rickflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
+from rickflow.tools import CWD
 
 
-def get_next_seqno_and_checkpoints():
+def get_next_seqno_and_checkpoints(work_dir="."):
     """
     Sets up the directory structure and reads the id of the next sequence
     to be simulated.
@@ -41,34 +40,35 @@ def get_next_seqno_and_checkpoints():
           LastSequenceReached: If the number in the file next.seqno is larger
           than the number in the file last.seqno
     """
-    if not os.path.isdir("trj"):  # directory for trajectories
-        os.mkdir("trj")
-    if not os.path.isdir("out"):  # directory for state files
-        os.mkdir("out")
-    if not os.path.isdir("res"):  # directory for restart files
-        os.mkdir("res")
+    with CWD(work_dir):
+        if not os.path.isdir("trj"):  # directory for trajectories
+            os.mkdir("trj")
+        if not os.path.isdir("out"):  # directory for state files
+            os.mkdir("out")
+        if not os.path.isdir("res"):  # directory for restart files
+            os.mkdir("res")
 
-    # a file containing the id of the next sequence to be simulated
-    if not os.path.isfile("next.seqno"):
-        with open("next.seqno", 'w') as fp:
-            fp.write("1")
-        next_seqno = 1
-    else:
-        with open("next.seqno", 'r') as fp:
-            next_seqno = int(fp.read())
+        # a file containing the id of the next sequence to be simulated
+        if not os.path.isfile("next.seqno"):
+            with open("next.seqno", 'w') as fp:
+                fp.write("1")
+            next_seqno = 1
+        else:
+            with open("next.seqno", 'r') as fp:
+                next_seqno = int(fp.read())
 
-    # a file containing the id of the last sequence to be simulated
-    if os.path.isfile("last.seqno"):
-        with open("last.seqno", 'r') as fp:
-            last_seqno = int(fp.read())
-            if next_seqno > last_seqno:
-                raise LastSequenceReached(last_seqno)
+        # a file containing the id of the last sequence to be simulated
+        if os.path.isfile("last.seqno"):
+            with open("last.seqno", 'r') as fp:
+                last_seqno = int(fp.read())
+                if next_seqno > last_seqno:
+                    raise LastSequenceReached(last_seqno)
 
-    current_checkpoint_file = None
-    current_state_file = None
-    if next_seqno > 1:
-        current_checkpoint_file = "res/checkpoint{}.chk".format(next_seqno - 1)
-        current_state_file = "res/state{}.xml".format(next_seqno - 1)
+        current_checkpoint_file = None
+        current_state_file = None
+        if next_seqno > 1:
+            current_checkpoint_file = "res/checkpoint{}.chk".format(next_seqno - 1)
+            current_state_file = "res/state{}.xml".format(next_seqno - 1)
 
     return next_seqno, current_checkpoint_file, current_state_file
 
@@ -112,7 +112,8 @@ class RickFlow(object):
                  box_dimensions, gpu_id=0,
                  nonbonded_method=PME,
                  recenter_coordinates=True,
-                 switch_distance=1.0*u.nanometer
+                 switch_distance=1.0*u.nanometer,
+                 work_dir="."
                  ):
         """
         The constructor sets up the system.
@@ -132,8 +133,9 @@ class RickFlow(object):
                 of non-water molecules.
         """
 
+        self.work_dir = work_dir
         self.next_seqno, self.current_checkpoint, self.current_state = (
-            get_next_seqno_and_checkpoints()
+            get_next_seqno_and_checkpoints(self.work_dir)
         )
         if gpu_id is not None:
             self.platform, self.platform_properties = require_cuda(gpu_id)
@@ -208,19 +210,20 @@ class RickFlow(object):
             integrator (OpenMM integrator object): The integrator to be used.
             barostat (OpenMM barostat object): The barostat. Pass None for NVT.
         """
-        if barostat:
-            self.system.addForce(barostat)
-        self.simulation = Simulation(self.psf.topology, self.system,
-                                     integrator, self.platform,
-                                     self.platform_properties)
-        self.context = self.simulation.context
-        self._initializeSimulation()
-        # write the system as a pdb file (this is important for postprocessing,
-        # if virtual sites were manually added to the system)
-        PDBReporter("system.pdb", 1).report(
-            self.simulation, self.context.getState(getPositions=True)
-        )
-        print("#Running on ", self.context.getPlatform().getName())
+        with CWD(self.work_dir):
+            if barostat:
+                self.system.addForce(barostat)
+            self.simulation = Simulation(self.psf.topology, self.system,
+                                         integrator, self.platform,
+                                         self.platform_properties)
+            self.context = self.simulation.context
+            self._initializeSimulation()
+            # write the system as a pdb file (this is important for postprocessing,
+            # if virtual sites were manually added to the system)
+            PDBReporter("system.pdb", 1).report(
+                self.simulation, self.context.getState(getPositions=True)
+            )
+            print("#Running on ", self.context.getPlatform().getName())
 
     def _initializeSimulation(self):
         """
@@ -263,125 +266,31 @@ class RickFlow(object):
         Run the simulation.
         """
         # define output for the current run
-        self.simulation.reporters.clear()
-        self.simulation.reporters.append(
-            DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), 1000))
-        self.simulation.reporters.append(
-            StateDataReporter("out/out{}.txt".format(self.next_seqno), 1000,
-                              step=True, time=True,
-                              potentialEnergy=True, temperature=True,
-                              volume=True, density=True, speed=True))
+        with CWD(self.work_dir):
+            self.simulation.reporters.clear()
+            self.simulation.reporters.append(
+                DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), 1000))
+            self.simulation.reporters.append(
+                StateDataReporter("out/out{}.txt".format(self.next_seqno), 1000,
+                                  step=True, time=True,
+                                  potentialEnergy=True, temperature=True,
+                                  volume=True, density=True, speed=True))
 
-        # run one sequence
-        duration = 1. * u.nanosecond
-        n_steps = round(duration / (1. * u.femtosecond))
-        print("Starting {} steps".format(n_steps))
+            # run one sequence
+            duration = 1. * u.nanosecond
+            n_steps = round(duration / (1. * u.femtosecond))
+            print("Starting {} steps".format(n_steps))
 
-        self.simulation.step(n_steps)
+            self.simulation.step(n_steps)
 
-        # save checkpoints
-        self.simulation.saveState("res/state{}.xml".format(self.next_seqno))
-        with open("res/checkpoint{}.chk".format(self.next_seqno), 'wb') as f:
-            f.write(self.simulation.context.createCheckpoint())
+            # save checkpoints
+            self.simulation.saveState("res/state{}.xml".format(self.next_seqno))
+            with open("res/checkpoint{}.chk".format(self.next_seqno), 'wb') as f:
+                f.write(self.simulation.context.createCheckpoint())
 
-        self.next_seqno += 1
-        with open("next.seqno", 'w') as fp:
-            fp.write(str(self.next_seqno))
+            self.next_seqno += 1
+            with open("next.seqno", 'w') as fp:
+                fp.write(str(self.next_seqno))
 
-
-class CharmmTrajectoryIterator(object):
-    """
-    Iterates over a set of charmm trajectories.
-
-    Yields:
-        mdtraj Trajectories from multiple files
-    """
-
-    def __init__(self, first_sequence=None, last_sequence=None,
-                 filename_template="trj/dyn{}.dcd", topology_file="system.pdb",
-                 selection="all"):
-
-        # select sequences
-        self.filename_template = filename_template
-        trajectory_files = glob.glob(filename_template.format("*"))
-        lstr, rstr = filename_template.split("{}")
-        sequence_ids = [int(trj[len(lstr):len(trj) - len(rstr)])
-                        for trj in trajectory_files]
-        if first_sequence is None:
-            first_sequence = min(sequence_ids)
-        if last_sequence is None:
-            last_sequence = max(sequence_ids)
-        for i in range(first_sequence, last_sequence + 1):
-            assert i in sequence_ids, "Error: Could not find trajectory file {}.".format(
-                i)
-        self.first = first_sequence
-        self.last = last_sequence
-
-        # create topology
-        top_suffix = os.path.basename(topology_file).split(".")[-1]
-        if top_suffix == "pdb":
-            self.topology = md.load(topology_file)
-        elif top_suffix == "psf":
-            self.topology = md.Topology.from_openmm(
-                CharmmPsfFile(topology_file).topology
-            )
-        else:
-            raise RickFlowException(
-                "Error: topology_file has to be a pdb or psf file."
-            )
-
-        self.selection = self.topology.select(selection)
-
-    def __iter__(self):
-        for i in range(self.first, self.last + 1):
-            trajectory = md.load_dcd(
-                self.filename_template.format(i),
-                top=self.topology, atom_indices=self.selection
-            )
-            yield trajectory
-
-
-def iterload(start_sequence=1, end_sequence=None, top=None,
-             particles=None, work_dir="."):
-    """
-    Load the trajectory in chunks.
-
-    Args:
-        start_sequence (int): First sequence to be analyzed.
-        end_sequence (int): If None, use all sequences.
-        top (Topology object): If None, use the topology from system.pdb.
-        particles (list of int, or string): The range of particles or a
-            string representing an mdtraj selection.
-        work_dir (str): The root directory of the rickflow.
-
-    Yields:
-        A pair (frame, values):
-         - frame: Frame of the trajectory.
-         - values: The corresponding row of the outfile.
-    """
-    if top is None:
-        top = md.load(os.path.join(work_dir, "system.pdb")).topology
-    outlist = glob.glob(os.path.join(work_dir, "out/*.txt"))
-    sequence_ids = [int(os.path.basename(out).split('.')[0].replace("out", ""))
-                    for out in outlist]
-    if end_sequence is None:
-        end_sequence = max(sequence_ids)
-    for i in range(start_sequence, end_sequence + 1):
-        assert i in sequence_ids
-
-    file_list = (
-        (os.path.join(work_dir, "trj/dyn{}.dcd".format(i)),
-         os.path.join(work_dir, "out/out{}.txt".format(i)))
-        for i in range(start_sequence, end_sequence + 1)
-    )
-
-    if isinstance(particles, str):
-        particles = top.select(particles)
-
-    for trj, out in file_list:
-        trajectory = md.load_dcd(trj, top, atom_indices=particles)
-        out_array = np.loadtxt(out, delimiter=",")
-        for frame, values in zip(trajectory, out_array):
-            yield frame, values
 
 
