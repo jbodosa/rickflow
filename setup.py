@@ -37,7 +37,7 @@ setup(
     description="Running and Analyzing OpenMM Jobs",
     entry_points={
         'console_scripts': [
-            'rickflow=rickflow.cli:main',
+            'rflow=rflow.cli:main',
         ],
     },
     install_requires=requirements,
@@ -46,8 +46,7 @@ setup(
     include_package_data=True,
     keywords='rickflow',
     name='rickflow',
-    package_dir={"rflow":"rickflow"},
-    packages=["rflow"],#find_packages(include=['rickflow']),
+    packages=find_packages(include=['rflow']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,

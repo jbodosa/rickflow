@@ -5,8 +5,8 @@
 
 import pytest
 
-from rickflow import RickFlow
-from rickflow.tools import abspath
+from rflow import RickFlow
+from rflow.tools import abspath
 import glob
 import os
 import pytest

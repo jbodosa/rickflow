@@ -2,9 +2,9 @@
 Tests for biasing tools.
 """
 
-from rickflow import biasing
-from rickflow.biasing import FreeEnergyCosineSeries, extract_z_histogram
-from rickflow.tools import abspath
+from rflow import biasing
+from rflow.biasing import FreeEnergyCosineSeries, extract_z_histogram
+from rflow.tools import abspath
 
 from pytest import approx
 

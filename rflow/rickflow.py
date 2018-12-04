@@ -18,8 +18,8 @@ from simtk.openmm.app import DCDReporter, StateDataReporter, PDBReporter
 
 import mdtraj as md
 
-from rickflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
-from rickflow.tools import CWD
+from rflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
+from rflow.tools import CWD
 
 
 def get_next_seqno_and_checkpoints(work_dir="."):

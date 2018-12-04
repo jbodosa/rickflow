@@ -6,7 +6,7 @@ import os
 import sys
 import click
 
-from rickflow import CharmmTrajectoryIterator
+from rflow import CharmmTrajectoryIterator
 
 @click.group()
 def main(args=None):

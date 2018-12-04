@@ -10,7 +10,7 @@ from simtk.openmm.app import CharmmPsfFile
 
 import mdtraj as md
 
-from rickflow.exceptions import RickFlowException
+from rflow.exceptions import RickFlowException
 
 
 class CharmmTrajectoryIterator(object):
