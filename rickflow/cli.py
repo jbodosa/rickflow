@@ -6,6 +6,7 @@ import os
 import sys
 import click
 
+from rickflow import CharmmTrajectoryIterator
 
 @click.group()
 def main(args=None):
@@ -53,27 +54,16 @@ workflow = RickFlow(
             fp.write(dynpy)
 
 
-
-
-
 @main.command()
-def submit():
-    pass
+@click.argument("batch")
+def submit(batch):
+    """
+    Submit the workflow using a batch script.
+    """
+    assert os.path.isfile(batch)
+    cwd = os.path.basename(os.getcwd())
+    os.system("sbatch -o {}-%j.log -J {} {}".format(cwd, cwd, submit_script))
 
 
 if __name__ == "__main__":
     sys.exit(main())  # pragma: no cover
-
-#if __name__ == "__main__":
-#    try:
-#        submit_script = sys.argv[1]
-#    except IndexError:
-#        print("Usage ./rickflow.py SUBMIT_SCRIPT")
-#        sys.exit(1)
-#    assert os.path.isfile(submit_script)#
-#
-#    if not os.path.isdir("out"):
-#        os.mkdir("out")
-#    cwd = os.path.basename(os.getcwd())
-#    os.system("sbatch -o {}-%j.log -J {} {}".format(cwd, cwd, submit_script))#
-
