@@ -4,7 +4,7 @@ import os
 import inspect
 import pkg_resources
 import traceback
-
+import numpy as np
 
 def abspath(relative_path): # type (object) -> object
     """Get file from a path that is relative to caller's module.
@@ -43,7 +43,7 @@ def selection(trajectory, sel):
     """
     if sel is None:
         return []
-    elif isinstance(sel, list):
+    elif isinstance(sel, list) or isinstance(sel, np.array):
         return sel
     else:
         return trajectory.topology.select(sel)
