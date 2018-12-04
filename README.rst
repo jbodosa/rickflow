@@ -61,7 +61,7 @@ Getting Started
 
 * `Counting Crossings`_
 
-.. _Counting Crossings:examples/counting_crossings.ipynb
+.. _Counting Crossings: examples/counting_crossings.ipynb
 
 
 Credits
