@@ -10,6 +10,9 @@ from rflow.tools import abspath
 import glob
 import os
 import pytest
+from simtk.openmm.app.internal.charmm.exceptions import CharmmPSFWarning
+
+pytestmark = pytest.mark.filterwarnings("ignore:Detected PSF molecule section that is WRONG")
 
 
 @pytest.fixture(scope="module")
