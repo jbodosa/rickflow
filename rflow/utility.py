@@ -43,7 +43,7 @@ def selection(trajectory, sel):
     """
     if sel is None:
         return []
-    elif isinstance(sel, list) or isinstance(sel, np.array):
+    elif isinstance(sel, list) or isinstance(sel, np.ndarray):
         return sel
     else:
         return trajectory.topology.select(sel)
