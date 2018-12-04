@@ -26,7 +26,41 @@ Running and Analyzing OpenMM Jobs
 Features
 --------
 
-* TODO
+* A handy front-end to run simulations in OpenMM
+* Setting up biased simulations in OpenMM to enhance permeation
+* Analysis of permeation from OpenMM and CHARMM trajectories
+
+
+Getting Started
+---------------
+
+1) Download and install anaconda_. And add the required lines to your .bashrc file.
+
+.. _anaconda:https://www.anaconda.com/download/#macos
+
+2) Create a conda environment with all the requirements::
+
+    $ conda create -n rflow -c omnia python=3.6 openmm mdtraj numpy pandas
+
+3) Activate the environment (has to be done every time you open a new terminal)::
+
+    $ conda activate rflow
+
+4) Clone the repository from gitlab::
+
+    $ git clone https://gitlab.com/Olllom/rickflow.git
+
+5) Install
+
+    $ cd rickflow
+    $ python setup.py install
+
+6) Take a look at the examples_::
+
+.. _examples: examples/
+
+* Counting Crossings: examples/counting_crossings.ipynb
+
 
 Credits
 -------

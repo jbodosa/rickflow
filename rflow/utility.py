@@ -6,6 +6,7 @@ import pkg_resources
 import traceback
 import numpy as np
 
+
 def abspath(relative_path): # type (object) -> object
     """Get file from a path that is relative to caller's module.
     Returns:    absolute path as string"""
