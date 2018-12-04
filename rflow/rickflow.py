@@ -19,7 +19,7 @@ from simtk.openmm.app import DCDReporter, StateDataReporter, PDBReporter
 import mdtraj as md
 
 from rflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
-from rflow.tools import CWD
+from rflow.utility import CWD
 
 
 def get_next_seqno_and_checkpoints(work_dir="."):

@@ -6,6 +6,9 @@ import numpy as np
 
 import mdtraj as md
 
+from rflow.utility import selection
+from rflow.trajectory import normalize
+
 
 class TransitionCounter(object):
     """
@@ -19,14 +22,14 @@ class TransitionCounter(object):
     >>> print(frame.matrices)
 
     """
-    def __init__(self, lag_iterations, num_bins, solute_ids, com_removal=False):
+    def __init__(self, lag_iterations, num_bins, solute, membrane=None):
         self.lag_iterations = lag_iterations
         self.fifo_positions = [None for _ in range(max(lag_iterations) + 1)]
         self.matrices = {lag: np.zeros((num_bins, num_bins), dtype=np.int32)
                          for lag in lag_iterations}
         self.num_bins = num_bins
-        self.solute_ids = solute_ids
-        self.com_removal = com_removal
+        self.solute = solute
+        self.membrane = membrane
         self.n_timesteps = 0
         self.average_box_height = 0.0
 
@@ -37,33 +40,13 @@ class TransitionCounter(object):
                          self.average_box_height/self.num_bins)
 
     def __call__(self, trajectory):
-        # get center of mass of the membrane (system minus water minus solute)
-        if self.com_removal:
-            membrane = trajectory.topology.select("not water")
-            for sol in self.solute_ids:
-                if sol in membrane:
-                    membrane.remove(sol)
-            membrane_trajectory = trajectory.atom_slice(membrane)
-            membrane_center = md.compute_center_of_mass(
-                membrane_trajectory
-            )
-        # normalize z coordinates: scale to [0,1] and shift membrane center to 0.5
-            z_normalized = trajectory.xyz[:, self.solute_ids,
-                           2].transpose() - membrane_center[:, 2]
-        else:
-            z_normalized = trajectory.xyz[:, self.solute_ids,
-                           2].transpose()
-
-        z_normalized = np.mod(
-            z_normalized / trajectory.unitcell_lengths[:, 2] + 0.5,
-            1.0).transpose()
+        z_normalized = normalize(trajectory, 2, self.membrane, self.solute)
 
         # update edges
         self.average_box_height = (self.average_box_height * self.n_timesteps
                                    + np.mean(trajectory.unitcell_lengths[:, 2]) * trajectory.n_frames)
         self.n_timesteps += trajectory.n_frames
         self.average_box_height /= self.n_timesteps
-
 
         # find bin indices
         h = 1.0 / self.num_bins
@@ -84,7 +67,7 @@ class TransitionCounter(object):
 
 class PermeationEventCounter(object):
 
-    def __init__(self, solute_ids, dividing_surface, center_threshold=0.02):
+    def __init__(self, solute_ids, dividing_surface, center_threshold=0.02, membrane=None):
         self.center_threshold = center_threshold
         self.dividing_surface = dividing_surface
         self.bins = np.array([center_threshold, 0.5 - dividing_surface,
@@ -101,6 +84,7 @@ class PermeationEventCounter(object):
         self.functional_bins = [1, 3, 5]
         self.startframe = 0
         self.solute_ids = solute_ids
+        self.membrane = membrane
         # trackers
         self.previous_z_digitized = None
         self.last_water_bin = np.array([-999999 for _ in solute_ids],
@@ -158,22 +142,7 @@ class PermeationEventCounter(object):
         self.previous_z_digitized = z_digitized_i
 
     def __call__(self, trajectory):
-        # get center of mass of the membrane (system minus water minus solute)
-        membrane = trajectory.topology.select("not water")
-        for sol in self.solute_ids:
-            if sol in membrane:
-                membrane.remove(sol)
-        membrane_trajectory = trajectory.atom_slice(membrane)
-        membrane_center = md.compute_center_of_mass(
-            membrane_trajectory
-        )
-
-        # normalize z coordinates: scale to [0,1] and shift membrane center to 0.5
-        z_normalized = trajectory.xyz[:, self.solute_ids,
-                       2].transpose() - membrane_center[:, 2]
-        z_normalized = np.mod(
-            z_normalized / trajectory.unitcell_lengths[:, 2] + 0.5,
-            1.0).transpose()
+        z_normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
 
         # find bin indices
         z_digitized = np.digitize(z_normalized, self.bins)

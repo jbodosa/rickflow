@@ -41,7 +41,9 @@ def selection(trajectory, sel):
     Returns:
         list of int: Selected atom ids.
     """
-    if isinstance(sel, list):
-        return list
+    if sel is None:
+        return []
+    elif isinstance(sel, list):
+        return sel
     else:
         return trajectory.topology.select(sel)

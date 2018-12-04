@@ -6,11 +6,15 @@ Iterate over dcd trajectories.
 
 import os
 import glob
+
+import numpy as np
+
 from simtk.openmm.app import CharmmPsfFile
 
 import mdtraj as md
 
 from rflow.exceptions import RickFlowException
+from rflow.utility import selection
 
 
 class CharmmTrajectoryIterator(object):
@@ -62,3 +66,39 @@ class CharmmTrajectoryIterator(object):
             yield trajectory
 
 
+def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
+    """
+    Normalize the trajectory so that all coordinates are in [0,1] and the center of
+    mass of the membrane is at 0.5.
+
+    Args:
+        trajectory:     An mdtraj trajectory object.
+        coordinates:    0,1, or 2 (for x,y,z); or a list
+        com_selection:  Selection of the membrane (to get the center of mass).
+                        Can be a list of ints or a selection string.
+        subselect:      Atom selection (usually the permeant). Can be a list of ints or a selection string.
+                        The normalized array will only contain the atoms in this selection.
+
+    Returns:
+        np.array: The normalized coordinates.
+
+    """
+    if com_selection is None:
+        membrane_center = np.array([0.0])
+    else:
+        membrane = selection(trajectory, com_selection)
+        membrane_trajectory = trajectory.atom_slice(membrane)
+        membrane_center = md.compute_center_of_mass(
+            membrane_trajectory
+        )[:, coordinates]
+
+    selected = selection(trajectory, subselect)
+    # normalize z coordinates: scale to [0,1] and shift membrane center to 0.5
+    z_normalized = trajectory.xyz[:, selected,
+                   coordinates].transpose() - membrane_center.transpose()
+
+    z_normalized = np.mod(
+        z_normalized / trajectory.unitcell_lengths[:, coordinates].transpose() + 0.5,
+        1.0).transpose()
+
+    return z_normalized
