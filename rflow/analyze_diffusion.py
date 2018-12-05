@@ -225,6 +225,7 @@ class Distribution(object):
         self.average_box_size = 0.0
         self.n_frames = 0
         self.bins = np.arange(0, 1.0 + 1e-6, 1.0/nbins)
+        self.nbins = nbins
         self.counts = 0.0
 
     @property
@@ -252,6 +253,6 @@ class Distribution(object):
         self.n_frames += trajectory.n_frames
         self.average_box_size /= self.n_frames
 
-        histogram = np.histogram(normalized, bins=self.bins)
+        histogram = np.histogram(normalized, bins=self.nbins, range=(0,1))  # this is !much! faster than manual bins
         self.counts = self.counts + histogram[0]
 
