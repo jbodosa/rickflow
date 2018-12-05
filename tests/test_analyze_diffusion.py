@@ -20,6 +20,10 @@ def test_transitions(iterator):
     for seq in iterator:
         tcount(seq)
     assert tcount.matrices[1].sum() == 199
+    assert tcount.edges.shape == (11,)
+    assert tcount.edges_around_zero.shape == (11,)
+    assert tcount.edges_around_zero.mean() == pytest.approx(0.0)
+    assert tcount.edges.mean() == pytest.approx(0.5*tcount.average_box_height)
 
 
 def test_permeation(iterator):
@@ -35,4 +39,3 @@ def test_distribution(iterator):
         dist(seq)
     assert dist.counts.shape == (10,)
     assert dist.counts.sum() == 200*1
-    

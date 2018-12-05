@@ -35,6 +35,11 @@ class TransitionCounter(object):
 
     @property
     def edges(self):
+        return np.arange(0.0, self.average_box_height + 1e-6,
+                         self.average_box_height/self.num_bins)
+
+    @property
+    def edges_around_zero(self):
         return np.arange(-0.5*self.average_box_height,
                          0.5*self.average_box_height + 1e-6,
                          self.average_box_height/self.num_bins)
