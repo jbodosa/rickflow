@@ -215,7 +215,7 @@ class PermeationEventCounter(object):
 
 class Distribution(object):
     def __init__(self, atom_selection, coordinate, nbins=100):
-        self.atom_ids = selection(atom_selection)
+        self.atom_selection = atom_selection
         self.coordinate = coordinate
         self.average_box_size = 0.0
         self.n_frames = 0
@@ -240,7 +240,8 @@ class Distribution(object):
         return - np.log(self.counts / np.max(self.counts))
 
     def __call__(self, trajectory):
-        normalized = normalize(trajectory, self.coordinate, subselect=self.solute_ids)
+        atom_ids = selection(trajectory, self.atom_selection)
+        normalized = normalize(trajectory, self.coordinate, subselect=atom_ids)
         box_size = trajectory.unitcell_lengths[:, self.coordinate]
         self.average_box_size = self.n_frames * self.average_box_size + trajectory.n_frames * box_size.mean()
         self.n_frames += trajectory.n_frames

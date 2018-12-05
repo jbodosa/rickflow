@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from rflow import CharmmTrajectoryIterator, TransitionCounter, PermeationEventCounter
+from rflow import CharmmTrajectoryIterator, TransitionCounter, PermeationEventCounter, Distribution
 from rflow.utility import abspath
 
 import pytest
@@ -27,3 +27,12 @@ def test_permeation(iterator):
     for seq in iterator:
         pcount(seq)
     assert len(pcount.events) == 0
+
+
+def test_distribution(iterator):
+    dist = Distribution(atom_selection=[51], coordinate=2, nbins=10)
+    for seq in iterator:
+        dist(seq)
+    assert dist.counts.shape == (10,)
+    assert dist.counts.sum() == 200*1
+    
