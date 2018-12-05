@@ -70,16 +70,17 @@ class PermeationEventCounter(object):
     def __init__(self, solute_ids, dividing_surface, center_threshold=0.02, membrane=None):
         self.center_threshold = center_threshold
         self.dividing_surface = dividing_surface
-        self.bins = np.array([center_threshold, 0.5 - dividing_surface,
+
+        self.bins = np.array([(0.5-dividing_surface)/2.0, 0.5 - dividing_surface,
                               0.5 - center_threshold, 0.5 + center_threshold,
-                              0.5 + dividing_surface, 1.0 - center_threshold,
+                              0.5 + dividing_surface, 1.0 - (0.5-dividing_surface)/2.0,
                               1.0])
         # bin 0: control bin at the first edge of the periodic boundary
-        # bin 1: first water bin
+        # bin 1: first donor/acceptor bin
         # bin 2: first outer membrane bin
         # bin 3: membrane center
         # bin 4: second outer membrane bin
-        # bin 5: second water bin
+        # bin 5: second donor/acceptor bin
         # bin 6: control bin at the second edge of the periodic boundary
         self.functional_bins = [1, 3, 5]
         self.startframe = 0
@@ -122,8 +123,7 @@ class PermeationEventCounter(object):
             if too_fast_particles.size > 0:
                 message = (
                     "An infeasible transition was detected for particles {} "
-                    "in trajectory frame {}. This indicates, that permeation "
-                    "events may be missed.".format(
+                    "in trajectory frame {}.".format(
                         [self.solute_ids[i] for i in too_fast_particles],
                         frame
                     )
@@ -132,7 +132,7 @@ class PermeationEventCounter(object):
                     np.isin(z_digitized_i[too_fast_particles], [2, 3, 4]))
                 if is_critical:
                     message += (
-                    " This seems to have been a "
+                    " This might have been a "
                     "transit through the bilayer."
                     "You should save your simulation "
                     "output more frequently or increase the "
@@ -211,3 +211,41 @@ class PermeationEventCounter(object):
 
         # finalize
         self.startframe += trajectory.n_frames
+
+
+class Distribution(object):
+    def __init__(self, atom_selection, coordinate, nbins=100):
+        self.atom_ids = selection(atom_selection)
+        self.coordinate = coordinate
+        self.average_box_size = 0.0
+        self.n_frames = 0
+        self.bins = np.arange(0, 1.0 + 1e-6, 1.0/nbins)
+        self.counts = 0.0
+
+    @property
+    def bin_centers(self):
+        return self.average_box_size * (self.bins[:-1] + 0.5*self.bins[1])
+
+    @property
+    def bin_centers_around_zero(self):
+        return self.average_box_size * (self.bins[:-1] + 0.5 * self.bins[1] - 0.5)
+
+    @property
+    def probability(self):
+        return self.counts / self.counts.sum()
+
+    @property
+    def free_energy(self):
+        """in kBT"""
+        return - np.log(self.counts / np.max(self.counts))
+
+    def __call__(self, trajectory):
+        normalized = normalize(trajectory, self.coordinate, subselect=self.solute_ids)
+        box_size = trajectory.unitcell_lengths[:, self.coordinate]
+        self.average_box_size = self.n_frames * self.average_box_size + trajectory.n_frames * box_size.mean()
+        self.n_frames += trajectory.n_frames
+        self.average_box_size /= self.n_frames
+
+        histogram = np.histogram(normalized, bins=self.bins)
+        self.counts = self.counts + histogram[0]
+
