@@ -4,6 +4,7 @@ from rflow import CharmmTrajectoryIterator, TransitionCounter, PermeationEventCo
 from rflow.utility import abspath
 
 import pytest
+import numpy as np
 
 
 @pytest.fixture(scope="module")
@@ -24,10 +25,21 @@ def test_transitions(iterator):
     assert tcount.edges_around_zero.shape == (11,)
     assert tcount.edges_around_zero.mean() == pytest.approx(0.0)
     assert tcount.edges.mean() == pytest.approx(0.5*tcount.average_box_height)
+    assert (tcount.matrices[1] == np.array(
+        [[0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+         [0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+         [0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+         [0,  0,  0, 25,  5,  0,  0,  0,  0,  0],
+         [0,  0,  0,  5, 59,  6,  0,  0,  0,  0],
+         [0,  0,  0,  0,  6, 61,  4,  0,  0,  0],
+         [0,  0,  0,  0,  0,  4, 24,  0,  0,  0],
+         [0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+         [0,  0,  0,  0,  0,  0,  0,  0,  0,  0],
+         [0,  0,  0,  0,  0,  0,  0,  0,  0,  0]])).all()
 
 
 def test_permeation(iterator):
-    pcount = PermeationEventCounter([51], 0.25, 0.1, "not water")
+    pcount = PermeationEventCounter([51], 0.1, 0.05, "not water")
     for seq in iterator:
         pcount(seq)
     assert len(pcount.events) == 0

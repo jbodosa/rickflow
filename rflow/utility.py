@@ -48,3 +48,17 @@ def selection(trajectory, sel):
         return sel
     else:
         return trajectory.topology.select(sel)
+
+
+def mydigitize(array, nbins, range):
+    """
+    An attempt to write a faster version of digitize.
+    Args:
+        array:
+        nbins:
+        range:
+
+    Returns:
+
+    """
+    pass

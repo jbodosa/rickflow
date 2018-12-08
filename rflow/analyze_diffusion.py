@@ -219,7 +219,16 @@ class PermeationEventCounter(object):
 
 
 class Distribution(object):
-    def __init__(self, atom_selection, coordinate, nbins=100):
+    def __init__(self, atom_selection, coordinate, nbins=100, com_selection=None):
+        """
+
+        Args:
+            atom_selection:
+            coordinate:
+            nbins:
+            com_selection: List of atom ids to calculate the com of the membrane, to make the distribution relative to
+                    the center of mass.
+        """
         self.atom_selection = atom_selection
         self.coordinate = coordinate
         self.average_box_size = 0.0
@@ -227,6 +236,7 @@ class Distribution(object):
         self.bins = np.arange(0, 1.0 + 1e-6, 1.0/nbins)
         self.nbins = nbins
         self.counts = 0.0
+        self.com_selection = com_selection
 
     @property
     def bin_centers(self):
@@ -247,7 +257,7 @@ class Distribution(object):
 
     def __call__(self, trajectory):
         atom_ids = selection(trajectory, self.atom_selection)
-        normalized = normalize(trajectory, self.coordinate, subselect=atom_ids)
+        normalized = normalize(trajectory, self.coordinate, subselect=atom_ids, com_selection=self.com_selection)
         box_size = trajectory.unitcell_lengths[:, self.coordinate]
         self.average_box_size = self.n_frames * self.average_box_size + trajectory.n_frames * box_size.mean()
         self.n_frames += trajectory.n_frames
