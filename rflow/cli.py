@@ -115,15 +115,12 @@ def tmat(permeant, first_seq, membrane=None,
     # save distributions
     np.savetxt(os.path.join(
         outdir, "distribution.first{}.len{}.nbins{}.txt".format(
-            first_seq, length, nbins), distribution)
-    )
+            first_seq, length, nbins)), distribution)
     np.savetxt(os.path.join(
         outdir, "distribution_com.first{}.len{}.nbins{}.txt".format(
-            first_seq, length, nbins), distribution_with_com)
-    )
+            first_seq, length, nbins)), distribution_with_com)
     np.savetxt(os.path.join(
-        outdir, "com.first{}.len{}".format(first_seq, length)
-    ))
+        outdir, "com.first{}.len{}".format(first_seq, length)), com)
 
 
 if __name__ == "__main__":
