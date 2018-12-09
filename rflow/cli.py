@@ -13,7 +13,7 @@ import numpy as np
 @click.group()
 def main(args=None):
     """Console script for rickflow."""
-    click.echo("Rickflow: a python package to facilitate running jobs in OpenMM using CHARMM defaults.")
+    click.echo("Rickflow: a python package to facilitate running and analyzing jobs in OpenMM using CHARMM defaults.")
     return 0
 
 
@@ -71,9 +71,10 @@ def submit(batch):
 @click.option("-p", "--permeant", type=str, help="Permeant selection string")
 @click.option("-f", "--first_seq", type=int, help="First sequence of trajectory", default=1)
 @click.option("-m", "--membrane", type=str, help="Membrane selection string for com removal", default=None)
-@click.option("-l", "--length", type=int, help="Number of sequences")
-@click.option("-n", "--nbins", type=int, help="Number of bins")
-@click.option("-o", "--outdir", type=str, help="Directory for the output files.")
+@click.option("-l", "--length", type=int, help="Number of sequences", default=100)
+@click.option("-n", "--nbins", type=int, help="Number of bins", default=100)
+@click.option("-o", "--outdir", type=str, help="Directory for the output files.", default=".")
+@click.option("-t", "--lag_iterations", type=int, multiple=True, default=[10, 20, 30, 40, 50, 60])
 def tmat(permeant, first_seq, membrane=None,
          length=100, lag_iterations=[10, 20, 30, 40, 50, 60],
          nbins=100, outdir="."):
