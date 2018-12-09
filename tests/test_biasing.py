@@ -3,9 +3,10 @@ Tests for biasing tools.
 """
 
 from rflow import biasing
-from rflow.biasing import FreeEnergyCosineSeries, extract_z_histogram
+from rflow.biasing import FreeEnergyCosineSeries
 from rflow.utility import abspath
 
+import pytest
 from pytest import approx
 
 import os
@@ -16,6 +17,30 @@ from simtk.openmm import System, Context, LangevinIntegrator
 from simtk.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
 from simtk import unit as u
 
+
+class OpenMMEnergyEvaluator(object):
+    """
+    calculating the energies of a biasing potential directly in openmm
+    """
+    def __init__(self):
+        # minimal system with one particle
+        self.system = System()
+        self.system.addParticle(1.0 * u.dalton)
+        self.context = None
+
+    def addForce(self, force, box_length):
+        self.system.addForce(force)
+        self.context = Context(self.system, LangevinIntegrator(
+            500.0, 1. / u.picosecond, 1.0 * u.femtosecond))
+        self.context.setPeriodicBoxVectors(*np.eye(3) * box_length)
+
+    def __call__(self, z):
+        self.context.setPositions(u.Quantity(value=np.array([[0.0, 0.0, z]]),
+                                        unit=u.angstrom))
+        state = self.context.getState(getEnergy=True)
+        energy = state.getPotentialEnergy().value_in_unit(
+            u.kilojoule_per_mole)
+        return energy
 
 
 def get_custom_force_classes():
@@ -57,52 +82,44 @@ def test_cos_series_with_quantities():
             == approx(4.184))
 
 
-def test_all_openmm_forces():
+@pytest.mark.parametrize("use_com_cv", [True, False])
+@pytest.mark.parametrize("constant_height", [True, False])
+def test_cos_openmm_force(use_com_cv, constant_height):
     """
     Tests if the forces applied by openmm are consistent with the ones
     that are output by the call function.
     """
+    series = FreeEnergyCosineSeries(
+        average_box_height=10.0 * u.angstrom,
+        coefficients=u.Quantity(value=np.array([1.0, 1.0]), unit=u.kilojoule_per_mole),
+        constant_height=constant_height
+    )
 
-    for cls in get_custom_force_classes():
-        for use_com_cv in [True, False]:
-            for constant_height in [True, False]:
+    # minimal system with one particle
+    system = System()
+    system.addParticle(1.0)
+    system.getNumParticles()
+    if use_com_cv:
+        system.addForce(series.as_openmm_cv_forces(particle_id_list=[[0]], system=system)[0])
+    else:
+        system.addForce(series.as_openmm_force(particle_ids=[0]))
+    context = Context(system, LangevinIntegrator(
+        500.0, 1./u.picosecond, 1.0* u.femtosecond))
+    context.setPeriodicBoxVectors(*np.eye(3)*10.0*u.angstrom)
 
-                series = cls(average_box_height=10.0 * u.angstrom,
-                             coefficients=u.Quantity(
-                                value=np.array([1.0, 1.0]),
-                                unit=u.kilojoule_per_mole
-                                ),
-                             constant_height=constant_height
-                             )
-
-                # minimal system with one particle
-                system = System()
-                system.addParticle(1.0)
-                system.getNumParticles()
-                if use_com_cv:
-                    system.addForce(series.as_openmm_cv_forces(particle_id_list=[[0]], system=system)[0])
-                else:
-                    system.addForce(series.as_openmm_force(particle_ids=[0]))
-                context = Context(system, LangevinIntegrator(
-                    500.0, 1./u.picosecond, 1.0* u.femtosecond))
-                context.setPeriodicBoxVectors(*np.eye(3)*10.0*u.angstrom)
-
-                for z in np.arange(0,10.0, 0.1):
-                    context.setPositions(u.Quantity(value=np.array([[0.0, 0.0, z]]),
-                                                   unit=u.angstrom)
-                                        )
-                    state = context.getState(getEnergy=True)
-                    target = series(z * u.angstrom).value_in_unit(
-                        u.kilojoule_per_mole)
-                    energy = state.getPotentialEnergy().value_in_unit(
-                        u.kilojoule_per_mole)
-                    assert target == approx(energy, abs=1e-5)
+    for z in np.arange(0,10.0, 0.1):
+        context.setPositions(u.Quantity(value=np.array([[0.0, 0.0, z]]),
+                                       unit=u.angstrom)
+                            )
+        state = context.getState(getEnergy=True)
+        target = series(z * u.angstrom).value_in_unit(
+            u.kilojoule_per_mole)
+        energy = state.getPotentialEnergy().value_in_unit(
+            u.kilojoule_per_mole)
+        assert target == approx(energy, abs=1e-5)
 
 
-#def test_from_fe_profile():
-#    fe_series = FreeEnergyCosineSeries.from_free_energy()
-
-
+@pytest.mark.skipif(True, reason="Deprecated")
 def test_extract_z_histogram(tmpdir):
 
     #for use_cv_force in [False, True]:

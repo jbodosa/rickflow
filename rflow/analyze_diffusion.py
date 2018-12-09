@@ -8,7 +8,7 @@ import mdtraj as md
 
 from rflow.utility import selection
 from rflow.trajectory import normalize
-
+from rflow.exceptions import RickFlowException
 
 class TransitionCounter(object):
     """
@@ -68,6 +68,17 @@ class TransitionCounter(object):
                     for i, j in zip(self.fifo_positions[0],
                                     self.fifo_positions[lag]):
                         self.matrices[lag][i, j] += 1
+
+    def save_matrices(self, filename_template):
+        try:
+            from dcma.matrices import Transitions
+        except:
+            raise RickFlowException("Saving transition matrices requires the dcma package to be installed.")
+        for l in self.matrices:
+            filename = filename_template.format(l)
+            tmat = Transitions(lag_time=l, edges=self.edges_around_zero, matrix=self.matrices[l])
+            tmat.save(filename)
+
 
 
 class PermeationEventCounter(object):

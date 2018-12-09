@@ -11,13 +11,14 @@ import simtk.unit as u
 from simtk.openmm.openmm import CustomExternalForce, CustomCVForce
 from simtk.openmm.openmm import System, TwoParticleAverageSite, NonbondedForce
 from simtk.openmm.app import Element
-import mdtraj as md
+from rflow.utility import selection
+
 
 
 def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
                              box_height=None):
     """
-    Make a collective variable for the center of mass of some particles.
+    Make a collective variable for the z-coordinate of the center of mass of some particles.
 
     Args:
         particle_ids (list of int): List of particle ids.
@@ -25,8 +26,8 @@ def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
         relative (bool): If True, divide com by instantaneous box length.
 
     Returns:
-        A dictionary with keys "x", "y", "z".
-        Each item represents a component of the center of mass.
+        A collective variable (in OpenMM, a collective variable is expressed as a custom force object).
+
     """
     total_mass = np.sum(masses)
     L_str = "(0.75*LZ + periodicdistance(0,0,0,0,0,0.75*LZ))"
@@ -242,25 +243,29 @@ class FreeEnergyCosineSeries(object):
         return FreeEnergyCosineSeries(box_height, cos_coeff[:num_coefficients])
 
 
-def extract_z_histogram(trjfiles, topology, particle_ids, num_bins=100):
-    """TODO: Deprecate and replace with something smarter"""
-    try:
-        top = md.Topology.from_openmm(topology)
-    except:
-        top = topology
-    trajectory = md.load(trjfiles[0], top=top, atom_indices=particle_ids)
-    for i in range(1, len(trjfiles)):
-        next_sequence = md.load(trjfiles[i], top=top, atom_indices=particle_ids)
-        trajectory = trajectory.join(next_sequence)
-    z_coordinates = np.array([frame.xyz[0][i][2] / frame.unitcell_lengths[0][2]
-                              for frame in trajectory
-                              for i in particle_ids])
-    box_sizes = [trajectory.openmm_boxes(i)[2][2].value_in_unit(u.angstrom)
-                 for i in range(trajectory.n_frames)]
-    box_size = np.mean(box_sizes)
-    # print(z_coordinates)
-    hist = np.histogram(np.mod(z_coordinates, 1.0),
-                        np.arange(0.0, 1. + 1e-10, 1.0 / num_bins))
-    hist = list(hist)
-    hist[1] = box_size * hist[1]
-    return hist
+class PartialCenterOfMassRestraint():
+    """
+    Harmonic restraint for the center of mass of a part of the system, e.g. a membrane.
+    """
+    def __init__(self, atom_ids, force_constant=None, relative=True, position=0.5, box_height=None):
+        self.atom_ids = atom_ids
+        self.force_constant = force_constant
+        self.relative = relative
+        self.position = position
+        self.energy_string = "k0 * (zcom - zref)^2"
+
+    def as_openmm_force(self, system):
+        biasing_force = CustomCVForce(self.energy_string)
+        #def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
+        #                         box_height=None):
+
+    def __str__(self):
+        string = "{}; k0 = {}, zref={}".format(
+            self.energy_string, self.force_constant, self.position
+        )
+        if self.relative:
+            string += "*L"
+        return string
+
+    def __call__(self, z, box_height):
+        return self.force_constant * (z - self.position) #)(else 1))
