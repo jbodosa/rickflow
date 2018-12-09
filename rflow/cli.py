@@ -113,12 +113,14 @@ def tmat(permeant, first_seq, membrane=None,
         outdir, "tmat.first{}.len{}.lag{{}}.nbins{}.txt".format(
             first_seq, length, nbins)))
     # save distributions
+    to_save1 = np.array([distribution.bin_centers_around_zero, distribution.probability]).transpose()
+    to_save2 = np.array([distribution_with_com.bin_centers_around_zero, distribution_with_com.probability]).transpose()
     np.savetxt(os.path.join(
         outdir, "distribution.first{}.len{}.nbins{}.txt".format(
-            first_seq, length, nbins)), distribution)
+            first_seq, length, nbins)), to_save1)
     np.savetxt(os.path.join(
         outdir, "distribution_com.first{}.len{}.nbins{}.txt".format(
-            first_seq, length, nbins)), distribution_with_com)
+            first_seq, length, nbins)), to_save2)
     if com:
         np.savetxt(os.path.join(
             outdir, "com.first{}.len{}".format(first_seq, length)), com)
