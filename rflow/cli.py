@@ -69,7 +69,7 @@ def submit(batch):
 
 @main.command()
 @click.option("-p", "--permeant", type=str, help="Permeant selection string")
-@click.option("-f", "--first", type=int, help="First sequence of trajectory", default=1)
+@click.option("-f", "--first_seq", type=int, help="First sequence of trajectory", default=1)
 @click.option("-m", "--membrane", type=str, help="Membrane selection string for com removal", default=None)
 @click.option("-l", "--length", type=int, help="Number of sequences")
 @click.option("-n", "--nbins", type=int, help="Number of bins")
