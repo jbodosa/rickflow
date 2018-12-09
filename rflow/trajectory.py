@@ -13,7 +13,7 @@ from simtk.openmm.app import CharmmPsfFile
 
 import mdtraj as md
 
-from rflow.exceptions import RickFlowException
+from rflow.exceptions import RickFlowException, TrajectoryNotFound
 from rflow.utility import selection
 
 
@@ -32,8 +32,8 @@ class CharmmTrajectoryIterator(object):
         if last_sequence is None:
             last_sequence = max(sequence_ids)
         for i in range(first_sequence, last_sequence + 1):
-            assert i in sequence_ids, \
-                "Error: Could not find trajectory file {}.".format(i)
+            if i not in sequence_ids:
+                raise TrajectoryNotFound(str(format(i)))
         self.first = first_sequence
         self.last = last_sequence
 

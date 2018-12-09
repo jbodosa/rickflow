@@ -24,3 +24,10 @@ class NoCuda(RickFlowException):
             "script is running on a GPU node."
             "Details: {}".format(exc)
         )
+
+
+class TrajectoryNotFound(RickFlowException):
+    def __init__(self, traj_name):
+        super(RickFlowException, self).__init__(
+            "Trajectory {} could not be loaded".format(traj_name)
+        )
