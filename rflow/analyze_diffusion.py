@@ -10,6 +10,7 @@ from rflow.utility import selection
 from rflow.trajectory import normalize
 from rflow.exceptions import RickFlowException
 
+
 class TransitionCounter(object):
     """
     A class to extract transitions matrices.

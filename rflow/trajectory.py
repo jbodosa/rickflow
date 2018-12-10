@@ -97,8 +97,11 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
     z_normalized = trajectory.xyz[:, selected,
                    coordinates].transpose() - membrane_center.transpose()
 
-    z_normalized = np.mod(
-        z_normalized / trajectory.unitcell_lengths[:, coordinates].transpose() + 0.5,
-        1.0).transpose()
+    z_normalized /= trajectory.unitcell_lengths[:, coordinates].transpose()
+
+    if com_selection is not None:
+        z_normalized += 0.5  # shift so that com is at 0.5
+
+    z_normalized = np.mod(z_normalized, 1.0).transpose()
 
     return z_normalized
