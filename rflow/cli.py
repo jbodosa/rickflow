@@ -6,11 +6,13 @@ import os
 import sys
 import click
 
+import rflow
 from rflow import CharmmTrajectoryIterator, Distribution, TransitionCounter
 import mdtraj as md
 import numpy as np
 
 @click.group()
+@click.version_option(version=rflow.__version__)
 def main(args=None):
     """Console script for rickflow."""
     click.echo("Rickflow: a python package to facilitate running and analyzing jobs in OpenMM using CHARMM defaults.")
