@@ -313,7 +313,7 @@ class RickFlow(object):
             # if required, copy temporary files over
             if self.tmp_output_dir is not None:
                 shutil.copy(os.path.join(self.tmp_output_dir, "trj/dyn{}.dcd".format(self.next_seqno)), "trj")
-                shutil.copy(os.path.join(self.tmp_output_dir, "out/out{}.dcd".format(self.next_seqno)), "out")
+                shutil.copy(os.path.join(self.tmp_output_dir, "out/out{}.txt".format(self.next_seqno)), "out")
                 shutil.copy(os.path.join(self.tmp_output_dir, "res/state{}.xml".format(self.next_seqno)), "res")
                 shutil.copy(os.path.join(self.tmp_output_dir, "res/checkpoint{}.chk".format(self.next_seqno)),
                             "res")

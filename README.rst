@@ -59,8 +59,11 @@ Getting Started
 
 .. _examples: examples/
 
+* `Running a Simulation from Charmm input files`_   
 * `Counting Crossings`_
 
+
+.. _Running a Simulation from Charmm input files: start_simulation/start_simulation.ipynb
 .. _Counting Crossings: examples/counting_crossings.ipynb
 
 
