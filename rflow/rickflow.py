@@ -309,17 +309,17 @@ class RickFlow(object):
             with open("res/checkpoint{}.chk".format(self.next_seqno), 'wb') as f:
                 f.write(self.simulation.context.createCheckpoint())
 
-            self.next_seqno += 1
-            with open("next.seqno", 'w') as fp:
-                fp.write(str(self.next_seqno))
-
-        # if required, copy temporary files over
-        if self.tmp_output_dir is not None:
-            with CWD(self.work_dir):
+        with CWD(self.work_dir):
+            # if required, copy temporary files over
+            if self.tmp_output_dir is not None:
                 shutil.copy(os.path.join(self.tmp_output_dir, "trj/dyn{}.dcd".format(self.next_seqno)), "trj")
                 shutil.copy(os.path.join(self.tmp_output_dir, "out/out{}.dcd".format(self.next_seqno)), "out")
                 shutil.copy(os.path.join(self.tmp_output_dir, "res/state{}.xml".format(self.next_seqno)), "res")
-                shutil.copy(os.path.join(self.tmp_output_dir, "res/checkpoint{}.chk".format(self.next_seqno)), "res")
-                shutil.copy(os.path.join(self.tmp_output_dir, "next.seqno".format(self.next_seqno)), ".")
+                shutil.copy(os.path.join(self.tmp_output_dir, "res/checkpoint{}.chk".format(self.next_seqno)),
+                            "res")
+            # increment sequence number
+            self.next_seqno += 1
+            with open("next.seqno", 'w') as fp:
+                fp.write(str(self.next_seqno))
 
 
