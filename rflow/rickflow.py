@@ -160,11 +160,13 @@ class RickFlow(object):
         else:
             self.platform = None
             self.platform_properties = None
-        self.parameters = CharmmParameterSet(*toppar)
-        self.psf = CharmmPsfFile(psf)
-        box_dimensions = [dim * u.angstrom for dim in box_dimensions]
-        self.psf.setBox(*box_dimensions)
-        self.crd = CharmmCrdFile(crd)
+
+        with CWD(work_dir):
+            self.parameters = CharmmParameterSet(*toppar)
+            self.psf = CharmmPsfFile(psf)
+            box_dimensions = [dim * u.angstrom for dim in box_dimensions]
+            self.psf.setBox(*box_dimensions)
+            self.crd = CharmmCrdFile(crd)
         # create system
         self._system = self.psf.createSystem(
             self.parameters,
