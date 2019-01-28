@@ -25,6 +25,7 @@ def create(template):
     """
     Setup a simulation. Create template dyn.py and sdyn.sh files.
     """
+    raise NotImplementedError
     dynpy = """
 #! /usr/bin/env python
 
@@ -64,9 +65,10 @@ def submit(batch):
     """
     Submit the workflow using a batch script.
     """
+    raise NotImplementedError
     assert os.path.isfile(batch)
     cwd = os.path.basename(os.getcwd())
-    os.system("sbatch -o {}-%j.log -J {} {}".format(cwd, cwd, submit_script))
+    os.system("sbatch -o {}-%j.log -J {} {}".format(cwd, cwd, batch))
 
 
 @main.command()
