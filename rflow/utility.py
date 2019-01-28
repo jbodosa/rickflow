@@ -24,6 +24,7 @@ class CWD(object):
     def __enter__(self): os.chdir(self.new_path); return self
 
     def __exit__(self, exc_type, exc_value, tb):
+        os.chdir(self.old_path)
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_value, tb)
             return False # uncomment to pass exception through
