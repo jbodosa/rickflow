@@ -10,4 +10,4 @@ recursive-exclude * *.py[co]
 
 recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif
 include versioneer.py
-include rickflow/_version.py
+include rflow/_version.py
