@@ -7,6 +7,7 @@ Translating Rick Venable's simulation workflow from CHARMM to OpenMM.
 import os
 import glob
 import numpy as np
+import shutil
 
 import simtk.unit as u
 from simtk.openmm import Platform
@@ -113,7 +114,8 @@ class RickFlow(object):
                  nonbonded_method=PME,
                  recenter_coordinates=True,
                  switch_distance=1.0*u.nanometer,
-                 work_dir="."
+                 work_dir=".",
+                 tmp_output_dir=None
                  ):
         """
         The constructor sets up the system.
@@ -131,12 +133,28 @@ class RickFlow(object):
             nonbonded_method (OpenMM object): openmm.app.PME for cutoff-LJ, openmm.app.LJPME for LJ-PME
             recenter_coordinates (bool): If True, recenter initial coordinates around center of mass
                 of non-water molecules.
+            switch_distance (simtk.unit): Switching distance for LJ potential.
+            work_dir (str): The working directory.
+            tmp_output_dir (str): A temporary directory for output during simulations.
         """
 
         self.work_dir = work_dir
         self.next_seqno, self.current_checkpoint, self.current_state = (
             get_next_seqno_and_checkpoints(self.work_dir)
         )
+        # prepare temporary output directory
+        if tmp_output_dir is not None:
+            assert os.path.exists(tmp_output_dir)
+            self.tmp_output_dir = os.path.normpath(tmp_output_dir)
+            with CWD(tmp_output_dir):
+                if not os.path.isdir("trj"):  # directory for trajectories
+                    os.mkdir("trj")
+                if not os.path.isdir("out"):  # directory for state files
+                    os.mkdir("out")
+                if not os.path.isdir("res"):  # directory for restart files
+                    os.mkdir("res")
+        else:
+            self.tmp_output_dir = None
         if gpu_id is not None:
             self.platform, self.platform_properties = require_cuda(gpu_id)
         else:
@@ -266,7 +284,8 @@ class RickFlow(object):
         Run the simulation.
         """
         # define output for the current run
-        with CWD(self.work_dir):
+        output_dir = self.work_dir if self.tmp_output_dir is None else self.tmp_output_dir
+        with CWD(output_dir):
             self.simulation.reporters.clear()
             self.simulation.reporters.append(
                 DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), 1000))
@@ -292,5 +311,13 @@ class RickFlow(object):
             with open("next.seqno", 'w') as fp:
                 fp.write(str(self.next_seqno))
 
+        # if required, copy temporary files over
+        if self.tmp_output_dir is not None:
+            with CWD(self.work_dir):
+                shutil.copy(os.path.join(self.tmp_output_dir, "trj/dyn{}.dcd".format(self.next_seqno)), "trj")
+                shutil.copy(os.path.join(self.tmp_output_dir, "out/out{}.dcd".format(self.next_seqno)), "out")
+                shutil.copy(os.path.join(self.tmp_output_dir, "res/state{}.xml".format(self.next_seqno)), "res")
+                shutil.copy(os.path.join(self.tmp_output_dir, "res/checkpoint{}.chk".format(self.next_seqno)), "res")
+                shutil.copy(os.path.join(self.tmp_output_dir, "next.seqno".format(self.next_seqno)), ".")
 
 
