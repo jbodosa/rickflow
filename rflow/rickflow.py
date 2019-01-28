@@ -93,7 +93,7 @@ def require_cuda(gpu_id=None, precision="mixed"):
     """
     try:
         assert "LD_LIBRARY_PATH" in os.environ
-        assert 'cuda' in os.environ["LD_LIBRARY_PATH"]
+        assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
         my_platform = Platform.getPlatformByName('CUDA')
     except Exception as e:
         raise NoCuda(e)
