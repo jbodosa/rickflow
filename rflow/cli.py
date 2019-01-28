@@ -60,12 +60,11 @@ workflow = RickFlow(
 
 
 @main.command()
-@click.argument("batch")
+@click.argument("batch", type=click.Path(exists=True))
 def submit(batch):
     """
     Submit the workflow using a batch script.
     """
-    raise NotImplementedError
     assert os.path.isfile(batch)
     cwd = os.path.basename(os.getcwd())
     os.system("sbatch -o {}-%j.log -J {} {}".format(cwd, cwd, batch))
