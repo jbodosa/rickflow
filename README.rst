@@ -63,7 +63,7 @@ Getting Started
 * `Counting Crossings`_
 
 
-.. _Running a Simulation from Charmm input files: start_simulation/start_simulation.ipynb
+.. _Running a Simulation from Charmm input files: examples/start_simulation/start_simulation.ipynb
 .. _Counting Crossings: examples/counting_crossings.ipynb
 
 
