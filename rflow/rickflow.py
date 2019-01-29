@@ -115,7 +115,8 @@ class RickFlow(object):
                  recenter_coordinates=True,
                  switch_distance=1.0*u.nanometer,
                  work_dir=".",
-                 tmp_output_dir=None
+                 tmp_output_dir=None,
+                 misc_psf_create_system_kwargs={}
                  ):
         """
         The constructor sets up the system.
@@ -136,6 +137,8 @@ class RickFlow(object):
             switch_distance (simtk.unit): Switching distance for LJ potential.
             work_dir (str): The working directory.
             tmp_output_dir (str): A temporary directory for output during simulations.
+            misc_psf_create_system_kwargs (dict): Provides an interface for the user to modify keyword
+                arguments of the CharmmPsfFile.createSystem() call.
         """
 
         self.work_dir = work_dir
@@ -168,12 +171,16 @@ class RickFlow(object):
             self.psf.setBox(*box_dimensions)
             self.crd = CharmmCrdFile(crd)
         # create system
+        psf_create_system_kwargs = {
+            "nonbondedMethod": nonbonded_method,
+            "nonbondedCutoff": 1.2 * u.nanometer,
+            "constraints": HBonds,
+            "switchDistance": switch_distance
+        }
+        psf_create_system_kwargs.update(misc_psf_create_system_kwargs)
         self._system = self.psf.createSystem(
             self.parameters,
-            nonbondedMethod=nonbonded_method,
-            nonbondedCutoff=1.2 * u.nanometer,
-            constraints=HBonds,
-            switchDistance=switch_distance
+            **psf_create_system_kwargs
         )
         # translate system so that the center of mass of non-waters is in the middle
         if recenter_coordinates:
