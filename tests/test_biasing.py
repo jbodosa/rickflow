@@ -3,7 +3,7 @@ Tests for biasing tools.
 """
 
 from rflow import biasing
-from rflow.biasing import FreeEnergyCosineSeries
+from rflow.biasing import FreeEnergyCosineSeries, RelativePartialCenterOfMassRestraint
 from rflow.utility import abspath
 
 import pytest
@@ -117,6 +117,37 @@ def test_cos_openmm_force(use_com_cv, constant_height):
         energy = state.getPotentialEnergy().value_in_unit(
             u.kilojoule_per_mole)
         assert target == approx(energy, abs=1e-5)
+
+
+def test_partial_com_restraint():
+    # minimal system with one particle
+    system = System()
+    system.addParticle(1.0)
+    system.getNumParticles()
+    system.addParticle(2.0)
+    k = 100.0 * u.kilojoule_per_mole
+    box_length = 10.0*u.angstrom
+    bias = RelativePartialCenterOfMassRestraint([0,1],
+                                        force_constant=k,
+                                        position=0.5,
+                                        box_height_guess=box_length*1.2 # an inaccurate guess is OK
+                                        )
+    system.addForce(bias.as_openmm_force(system))
+    context = Context(system, LangevinIntegrator(
+        500.0, 1. / u.picosecond, 1.0 * u.femtosecond))
+    context.setPeriodicBoxVectors(*np.eye(3)*box_length)
+    for z in np.arange(0, 10.0, 0.1):
+        positions = u.Quantity(
+            value=np.array([[0.0,0.0,0.0],[0.0, 0.0, z]]), unit=u.angstrom)
+        context.setPositions(positions)
+        ener = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+            u.kilojoule_per_mole)
+        expected = (k * ((2.*z*u.angstrom)/3./box_length - 0.5)**2).value_in_unit(u.kilojoule_per_mole)
+        assert ener == approx(expected, abs=1e-4)
+        assert ener == approx(
+            bias(positions, [1.0*u.dalton,2.0*u.dalton], box_length).value_in_unit(u.kilojoule_per_mole),
+            abs=1e-4
+        )
 
 
 @pytest.mark.skipif(True, reason="Deprecated")

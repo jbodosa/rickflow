@@ -14,7 +14,6 @@ from simtk.openmm.app import Element
 from rflow.utility import selection
 
 
-
 def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
                              box_height=None):
     """
@@ -24,9 +23,13 @@ def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
         particle_ids (list of int): List of particle ids.
         masses (list of floats): The particle masses.
         relative (bool): If True, divide com by instantaneous box length.
+        box_height (a simtk.unit for lengths): A guess for the instantaneous box_height.
 
     Returns:
         A collective variable (in OpenMM, a collective variable is expressed as a custom force object).
+
+    Note:
+        The instantaneous box height must not deviate more than 25% from the box_height.
 
     """
     total_mass = np.sum(masses)
@@ -243,29 +246,53 @@ class FreeEnergyCosineSeries(object):
         return FreeEnergyCosineSeries(box_height, cos_coeff[:num_coefficients])
 
 
-class PartialCenterOfMassRestraint():
+class RelativePartialCenterOfMassRestraint(object):
     """
-    Harmonic restraint for the center of mass of a part of the system, e.g. a membrane.
+    Harmonic restraint for the center of mass of a part of the system, e.g. a membrane, relative to the box height.
     """
-    def __init__(self, atom_ids, force_constant=None, relative=True, position=0.5, box_height=None):
+    def __init__(self, atom_ids, force_constant=None, position=0.5, box_height_guess=None):
+        """
+        Args:
+            atom_ids (list of int): The atom ids on which the restraint acts.
+            force_constant (simtk.unit.Quantity object): The force constant in units of energy.
+            position (float): A float between 0 and 1, indicating the minimum of the restraint
+                relative to the instantaneous box height.
+            box_height_guess (simtk.unit.Quantity object): A length that provides a guess
+                for the box height. Must not deviate from any instantaneous box height by more than 25%.
+        """
         self.atom_ids = atom_ids
         self.force_constant = force_constant
-        self.relative = relative
         self.position = position
         self.energy_string = "k0 * (zcom - zref)^2"
+        self.box_height = box_height_guess
 
     def as_openmm_force(self, system):
+        """
+        Args:
+            system: The OpenMM system.
+
+        Returns:
+            An OpenMM force object.
+        """
         biasing_force = CustomCVForce(self.energy_string)
-        #def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
-        #                         box_height=None):
+        masses = [system.getParticleMass(atom) for atom in self.atom_ids]
+        com_cv = make_center_of_mass_z_cv(self.atom_ids, masses, relative=True, box_height=self.box_height)
+        biasing_force.addCollectiveVariable("zcom", com_cv)
+        biasing_force.addGlobalParameter("zref", self.position)
+        biasing_force.addGlobalParameter("k0", self.force_constant)
+        return biasing_force
 
     def __str__(self):
         string = "{}; k0 = {}, zref={}".format(
             self.energy_string, self.force_constant, self.position
         )
-        if self.relative:
-            string += "*L"
         return string
 
-    def __call__(self, z, box_height):
-        return self.force_constant * (z - self.position) #)(else 1))
+    def __call__(self, positions, masses, box_height):
+        z_com = 0.0 * u.nanometer * u.dalton
+        total_mass = 0.0 * u.dalton
+        for i in self.atom_ids:
+            total_mass += masses[i]
+            z_com += positions[i][2] * masses[i]
+        z_com /= total_mass
+        return self.force_constant * (z_com/box_height - self.position)**2
