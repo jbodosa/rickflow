@@ -23,7 +23,8 @@ def rickflow_instance(tmpdir_factory):
         crd=abspath("data/rb2dlpc.crd"),
         box_dimensions=[47.7695166, 47.7695166, 137.142387],
         gpu_id=None,
-        work_dir=str(tmpdir_factory.mktemp('rflow'))
+        work_dir=str(tmpdir_factory.mktemp('rflow')),
+        misc_psf_create_system_kwargs={"constraints": None}
     )
 
 
