@@ -73,15 +73,16 @@ class BoxSize(object):
 
 
 class Coordinates(object):
-    def __init__(self, atom_ids, normalize=False, com_selection=None):
+    def __init__(self, atom_ids, coordinates=2, normalize=False, com_selection=None):
         self.atom_ids = atom_ids
+        self.coordinates = coordinates
         self.normalize = normalize
         self.com_selection = com_selection
         self.name = "Coordinates"
 
     def __call__(self, traj):
         if self.normalize:
-            normalized = normalize(traj, com_selection=self.com_selection, subselect=self.atom_ids)
+            normalized = normalize(traj, coordinates=self.coordinates, com_selection=self.com_selection, subselect=self.atom_ids)
             return normalized.xyz
         else:
-            return traj.xyz[:,self.atom_ids,:]
+            return traj.xyz[:, self.atom_ids, self.coordinates]
