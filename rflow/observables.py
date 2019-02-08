@@ -4,7 +4,7 @@
 
 import os
 import numpy as np
-
+from rflow.analyze_diffusion import normalize
 
 class TimeSeries(object):
     """A time series."""
@@ -73,9 +73,15 @@ class BoxSize(object):
 
 
 class Coordinates(object):
-    def __init__(self, atom_ids):
+    def __init__(self, atom_ids, normalize=False, com_selection=None):
         self.atom_ids = atom_ids
+        self.normalize = normalize
+        self.com_selection = com_selection
         self.name = "Coordinates"
 
     def __call__(self, traj):
-        return traj.xyz[:,self.atom_ids,:]
+        if self.normalize:
+            normalized = normalize(traj, com_selection=self.com_selection, subselect=self.atom_ids)
+            return normalized.xyz
+        else:
+            return traj.xyz[:,self.atom_ids,:]
