@@ -8,7 +8,15 @@ import numpy as np
 
 class TimeSeries(object):
     """A time series."""
-    def __init__(self, name="", filename=None, append=False):
+    def __init__(self, evaluator=None, name="", filename=None, append=False):
+        """
+
+        Args:
+            evaluator (callable): The callable takes an mdtraj trajectory as its only argument and returns a numpy array.
+            filename:
+            append:
+        """
+        self.evaluator = evaluator
         self.name = name
         self._data = []
         self.filename = filename
@@ -35,6 +43,9 @@ class TimeSeries(object):
         self.update_file()
         return self
 
+    def __call__(self, traj):
+        self += list(self.evaluator(traj))
+
     def append(self, value):
         self._data.append(value)
         self.update_file()
@@ -45,10 +56,9 @@ class TimeSeries(object):
 
 
 class AreaPerLipid(object):
-    def __init__(self, num_lipids_per_leaflet, filename=None, append=False):
+    def __init__(self, num_lipids_per_leaflet):
         self.num_lipids_per_leaflet = num_lipids_per_leaflet
-        self.area = TimeSeries(name="Area per Lipid", filename=filename, append=append)
+        self.name = "Area per Lipid (nm^2)"
 
     def __call__(self, traj):
-        self.area += list(traj.unitcell_lengths[:,0]*traj.unitcell_lengths[:,1] / self.num_lipids_per_leaflet)
-
+        return traj.unitcell_lengths[:,0]*traj.unitcell_lengths[:,1] / self.num_lipids_per_leaflet

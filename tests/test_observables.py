@@ -49,3 +49,15 @@ def test_time_series_radd():
     assert q.data[0] == 1.0
     assert q.data[1] == 2.0
     assert q.mean == approx(1.5)
+
+
+def test_evaluator():
+    def double(a):
+        return np.array([2*a])
+    q = TimeSeries(evaluator=double)
+    q(1)
+    q(2)
+    q(3)
+    assert q.data[0] == 2
+    assert q.data[1] == 4
+    assert q.data[2] == 6
