@@ -83,6 +83,6 @@ class Coordinates(object):
     def __call__(self, traj):
         if self.normalize:
             normalized = normalize(traj, coordinates=self.coordinates, com_selection=self.com_selection, subselect=self.atom_ids)
-            return normalized.xyz
+            return normalized
         else:
             return traj.xyz[:, self.atom_ids, self.coordinates]
