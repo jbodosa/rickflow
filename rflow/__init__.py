@@ -16,3 +16,4 @@ from rflow.exceptions import *
 from rflow.integrators import NonequilibriumLangevinIntegrator
 from rflow.rickflow import *
 from rflow.trajectory import *
+from rflow.observables import TimeSeries, AreaPerLipid

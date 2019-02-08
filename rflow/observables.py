@@ -49,5 +49,5 @@ class AreaPerLipid(object):
         self.area = TimeSeries(name="Area per Lipid", filename=filename, append=append)
 
     def __call__(self, traj):
-        self.area += traj.unitcell_lengths[:,0]*traj.unitcell_lengths[:,1] / self.num_lipids_per_leaflet
+        self.area += list(traj.unitcell_lengths[:,0]*traj.unitcell_lengths[:,1] / self.num_lipids_per_leaflet)
 
