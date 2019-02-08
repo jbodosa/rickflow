@@ -62,3 +62,20 @@ class AreaPerLipid(object):
 
     def __call__(self, traj):
         return traj.unitcell_lengths[:,0]*traj.unitcell_lengths[:,1] / self.num_lipids_per_leaflet
+
+
+class BoxSize(object):
+    def __init__(self):
+        self.name = "Box Vectors (nm)"
+
+    def __call__(self, traj):
+        return traj.unitcell_lengths
+
+
+class Coordinates(object):
+    def __init__(self, atom_ids):
+        self.atom_ids = atom_ids
+        self.name = "Coordinates"
+
+    def __call__(self, traj):
+        return traj.xyz[:,self.atom_ids,:]
