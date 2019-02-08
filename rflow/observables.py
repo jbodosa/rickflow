@@ -33,6 +33,7 @@ class TimeSeries(object):
     def __radd__(self, value):
         self._data += value
         self.update_file()
+        return self
 
     def append(self, value):
         self._data.append(value)
