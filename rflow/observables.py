@@ -1,23 +1,26 @@
 """
-
+Tools for analyzing MD observables
 """
 
 import os
 import numpy as np
 from rflow.analyze_diffusion import normalize
 
+
 class TimeSeries(object):
     """A time series."""
     def __init__(self, evaluator=None, name="", filename=None, append=False):
         """
-
         Args:
             evaluator (callable): The callable takes an mdtraj trajectory as its only argument and returns a numpy array.
             filename:
             append:
         """
         self.evaluator = evaluator
-        self.name = name
+        if hasattr(evaluator, name) and name=="":
+            self.name = evaluator.name
+        else:
+            self.name = name
         self._data = []
         self.filename = filename
         if append and os.path.isfile(filename):
@@ -86,3 +89,4 @@ class Coordinates(object):
             return normalized
         else:
             return traj.xyz[:, self.atom_ids, self.coordinates]
+

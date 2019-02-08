@@ -51,9 +51,11 @@ def test_time_series_radd():
     assert q.mean == approx(1.5)
 
 
+def double(a):
+    return np.array([2*a])
+
+
 def test_evaluator():
-    def double(a):
-        return np.array([2*a])
     q = TimeSeries(evaluator=double)
     q(1)
     q(2)
@@ -61,3 +63,18 @@ def test_evaluator():
     assert q.data[0] == 2
     assert q.data[1] == 4
     assert q.data[2] == 6
+
+
+def test_evaluator_with_file(tmpdir):
+    datafile = os.path.join(str(tmpdir), "data.txt")
+    q = TimeSeries(evaluator=double, filename=datafile)
+    q(1)
+    q(2)
+    q(3)
+    assert os.path.isfile(datafile)
+    retrieved = np.loadtxt(datafile)
+    assert retrieved[0] == 2
+    assert retrieved[1] == 4
+    assert retrieved[2] == 6
+
+
