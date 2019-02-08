@@ -41,3 +41,11 @@ def test_statistical_quantity_vector(tmpdir):
     retrieved = np.loadtxt(datafile)
     assert np.isclose(retrieved[0], [1.0, 2.0]).all()
     assert np.isclose(retrieved[1], [2.0, 3.0]).all()
+
+
+def test_time_series_radd():
+    q = TimeSeries()
+    q += [1.0, 2.0]
+    assert q.data[0] == 1.0
+    assert q.data[1] == 2.0
+    assert q.mean == approx(1.5)

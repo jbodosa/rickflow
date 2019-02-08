@@ -30,7 +30,7 @@ class TimeSeries(object):
     def __len__(self):
         return len(self._data)
 
-    def __radd__(self, value):
+    def __iadd__(self, value):
         self._data += value
         self.update_file()
         return self
