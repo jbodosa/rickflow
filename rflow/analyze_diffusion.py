@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from warnings import warn
+import pickle
 
 import numpy as np
 
@@ -278,3 +279,16 @@ class Distribution(object):
         histogram = np.histogram(normalized, bins=self.nbins, range=(0,1))  # this is !much! faster than manual bins
         self.counts = self.counts + histogram[0]
 
+    def save(self, filename):
+        data = np.array([self.bin_centers, self.bin_centers_around_zero, self.counts,
+                         self.probability, self.free_energy])
+        np.savetxt(filename, data.transpose(),
+                   header="bin_centers, bin_centers_around_0, counts, probability, free_energy_(kBT)\n")
+
+        with open(filename + ".pic", 'wb') as pic:
+            pickle.dump(self, pic)
+
+    @staticmethod
+    def load_from_pic(filename):
+        with open(filename, 'rb') as pic:
+            return pickle.load(pic)

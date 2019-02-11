@@ -3,6 +3,7 @@
 from rflow import CharmmTrajectoryIterator, TransitionCounter, PermeationEventCounter, Distribution
 from rflow.utility import abspath
 
+import os
 import pytest
 import numpy as np
 
@@ -53,3 +54,14 @@ def test_distribution(iterator):
         dist(seq)
     assert dist.counts.shape == (10,)
     assert dist.counts.sum() == 200*1
+
+
+def test_distribution_save(iterator, tmpdir):
+    datafile = os.path.join(str(tmpdir), "distribution.txt")
+    dist = Distribution(atom_selection=[51], coordinate=2, nbins=10)
+    for seq in iterator:
+        dist(seq)
+    dist.save(datafile)
+    loaded = np.loadtxt(datafile)
+    assert loaded.shape == (10, 5)
+    Distribution.load_from_pic(datafile + ".pic")
