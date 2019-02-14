@@ -65,7 +65,7 @@ Getting Started
 
 .. _Running a Simulation from Charmm input files: examples/start_simulation/start_simulation.ipynb
 .. _Counting Crossings: examples/counting_crossings.ipynb
-.. _Extracting Diffusion Profiles: examples/diffusion_profiles/bayesian_diffusion_profiles.ipynb
+.. _Extracting Diffusion Profiles: examples/diffusion_profiles/bayesian_diffusion_profiles.rst
 
 
 Credits
