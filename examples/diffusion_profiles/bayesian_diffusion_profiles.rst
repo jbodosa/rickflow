@@ -200,4 +200,6 @@ this file also lists the permeability.
 This is how it looks like (the labels got messed up, but anyway :-), you
 can plot directly from the .txt files).
 
+.. image: profiles_lag10_D.png
+.. image: profiles_lag10_F.png
 
