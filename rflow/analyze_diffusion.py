@@ -74,13 +74,13 @@ class TransitionCounter(object):
     def save_matrices(self, filename_template):
         try:
             from dcma.matrices import Transitions
-        except:
+        except ImportError:
             raise RickFlowException("Saving transition matrices requires the dcma package to be installed.")
         for l in self.matrices:
             filename = filename_template.format(l)
-            tmat = Transitions(lag_time=l, edges=self.edges_around_zero, matrix=self.matrices[l])
+            #                              dcma expects edges in angstrom: multiply by 10
+            tmat = Transitions(lag_time=l, edges=self.edges_around_zero*10.0, matrix=self.matrices[l])
             tmat.save(filename)
-
 
 
 class PermeationEventCounter(object):
