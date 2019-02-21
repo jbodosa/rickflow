@@ -145,6 +145,7 @@ class RickFlow(object):
         self.next_seqno, self.current_checkpoint, self.current_state = (
             get_next_seqno_and_checkpoints(self.work_dir)
         )
+        self.gpu_id = gpu_id
         # prepare temporary output directory
         if tmp_output_dir is not None:
             assert os.path.exists(tmp_output_dir)
@@ -158,11 +159,6 @@ class RickFlow(object):
                     os.mkdir("res")
         else:
             self.tmp_output_dir = None
-        if gpu_id is not None:
-            self.platform, self.platform_properties = require_cuda(gpu_id)
-        else:
-            self.platform = None
-            self.platform_properties = None
 
         with CWD(self.work_dir):
             self.parameters = CharmmParameterSet(*toppar)
@@ -237,14 +233,20 @@ class RickFlow(object):
             integrator (OpenMM integrator object): The integrator to be used.
             barostat (OpenMM barostat object): The barostat. Pass None for NVT.
         """
+        if self.gpu_id is not None:
+            platform, platform_properties = require_cuda(self.gpu_id)
+        else:
+            platform = None
+            platform_properties = None
+        if barostat:
+            self.system.addForce(barostat)
+
         with CWD(self.work_dir):
-            if barostat:
-                self.system.addForce(barostat)
             self.simulation = Simulation(self.psf.topology, self.system,
-                                         integrator, self.platform,
-                                         self.platform_properties)
+                                         integrator, platform,
+                                         platform_properties)
             self.context = self.simulation.context
-            self._initializeSimulation()
+            self._initializeState()
             # write the system as a pdb file (this is important for postprocessing,
             # if virtual sites were manually added to the system)
             PDBReporter("system.pdb", 1).report(
@@ -252,7 +254,7 @@ class RickFlow(object):
             )
             print("#Running on ", self.context.getPlatform().getName())
 
-    def _initializeSimulation(self):
+    def _initializeState(self):
         """
         Initialize state, use checkpoint for seqno > 1.
         """
