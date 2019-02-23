@@ -5,7 +5,7 @@ Tools for analyzing MD observables
 import os
 import numpy as np
 from rflow.analyze_diffusion import normalize
-
+import mdtraj as md
 
 class TimeSeries(object):
     """A time series."""

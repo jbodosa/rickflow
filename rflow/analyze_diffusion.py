@@ -67,6 +67,7 @@ class TransitionCounter(object):
             # add to transition matrices
             for lag in self.lag_iterations:
                 if self.fifo_positions[lag] is not None:
+                    # TODO: Replace by np.add.at
                     for i, j in zip(self.fifo_positions[0],
                                     self.fifo_positions[lag]):
                         self.matrices[lag][i, j] += 1
@@ -85,7 +86,8 @@ class TransitionCounter(object):
 
 class PermeationEventCounter(object):
 
-    def __init__(self, solute_ids, dividing_surface, center_threshold=0.02, membrane=None):
+    def __init__(self, solute_ids, dividing_surface, center_threshold=0.02, membrane=None,
+                 initialize_all_permeants=True):
         self.center_threshold = center_threshold
         self.dividing_surface = dividing_surface
 
@@ -120,6 +122,7 @@ class PermeationEventCounter(object):
         self.last_functional_bin = np.array([-999999 for _ in solute_ids],
                                             dtype=np.int32)
         self.events = []
+        self.initialize_all_permeants = initialize_all_permeants
 
     @property
     def num_crossings(self):
@@ -164,6 +167,15 @@ class PermeationEventCounter(object):
 
         # find bin indices
         z_digitized = np.digitize(z_normalized, self.bins)
+
+        # initialize flags for all permeants
+        if self.initialize_all_permeants:
+            if (-999999 in self.last_functional_bin) or (-999999 in self.last_water_bin):
+                self.last_functional_bin = z_digitized
+                self.last_functional_bin[np.where[np.isin(self.last_functional_bin, [0,1,2])]] = 1
+                self.last_functional_bin[np.where[np.isin(self.last_functional_bin, [4,5,6])]] = 5
+                assert np.isin(self.last_functional_bin, self.functional_bins).all()
+                self.last_water_bin = (z_normalized < 0.5)*1 + (z_normalized >= 0.5)*5
 
         for i in range(trajectory.n_frames):
             frame = self.startframe + i
