@@ -1,22 +1,43 @@
+"""
+
+"""
+
+from copy import deepcopy
+import pickle
+
 import numpy as np
-from rflow import normalize
 import mdtraj as md
 
+from rflow import normalize, BinEdgeUpdater, RickFlowException
 
-class NearestNeighborAnalysis(object):
-    """
+
+class NearestNeighorException(RickFlowException):
+    pass
+
+
+class NearestNeighborAnalysis(BinEdgeUpdater):
+    """This class runs a very specific nearest neighbor analysis in a heterogeneous membrane.
+
+    For some permeant molecules, it finds the nearest neighboring lipid chain atoms.
+    For example, for a bilayer containing PSM, POPC, and cholesterol, it figures out the closest
+    chain atoms.
     """
 
     def __init__(self, permeants, chains, num_z_bins=50,
                  num_neighbors=3, com_selection=None):
         """
         """
+        # input arguments
         self.permeants = permeants
         self.chains = chains
         self.num_z_bins = num_z_bins
         self.num_neighbors = num_neighbors
         self.com_selection = com_selection
 
+        # initialize the parent object that keeps track of bin centers and bin edges
+        super(NearestNeighborAnalysis, self).__init__(num_z_bins, coordinate=2)
+
+        # derived quantities
         bin_width = 1.0 / num_z_bins
         self.bins = np.arange(bin_width, 1.0 + bin_width, bin_width)
         self.num_permeants = len(self.permeants)
@@ -41,7 +62,7 @@ class NearestNeighborAnalysis(object):
         # in the z_index-th bin, whose closest neighbors belong to the chains with chain_index1, chain_index2, etc.
         # e.g., counts[0,1,1,1] denots the number of occurences, where the nearest neighbors of a permeant atom
         # in the first bin all belonged to chain id 1
-        self.counts = np.zeros([num_z_bins] + [num_neighbors] * self.num_chains, dtype=int)
+        self.counts = np.zeros([num_z_bins] + [self.num_chains] * num_neighbors, dtype=int)
 
     def __call__(self, traj):
         for i in range(traj.n_frames):
@@ -49,6 +70,8 @@ class NearestNeighborAnalysis(object):
             self.call_on_frame(frame)
 
     def call_on_frame(self, frame):
+        # update bin centers and bin edges
+        super(NearestNeighborAnalysis, self).__call__(frame)
         # normalize z axis and categorize z coordinates into bins
         z_normalized = normalize(frame, com_selection=self.com_selection,
                                  coordinates=2, subselect=self.permeants)
@@ -78,18 +101,63 @@ class NearestNeighborAnalysis(object):
         self.counts = self.increment_using_multiindices(self.counts, count_indices)
 
     def __add__(self, other):
-        pass
+        try:
+            assert np.array_equal(other.permeants, self.permeants)
+            assert np.array_equal(np.concatenate(other.chains), np.concatenate(self.chains))
+            assert other.num_z_bins == self.num_z_bins
+            assert np.array_equal(other.com_selection, self.com_selection)
+        except AssertionError:
+            raise NearestNeighorException("For adding nearest neighbor analysis instances, they "
+                                          "have to share the same permeants, chains, num_z_bins, "
+                                          "and com_selection.")
+        assert self.counts.shape == other.counts.shape
+        result = deepcopy(self)
+        result.counts += other.counts
+        result.n_frames = self.n_frames + other.n_frames
+        result.average_box_size = (1.0/result.n_frames *
+            (self.n_frames * self.average_box_size + other.n_frames * other.average_box_size)
+        )
+        return result
+
+    def __radd__(self, other): # enables usage of sum(...)
+        if other:
+            return other + self
+        else:
+            return self
+
+    def __eq__(self, other):
+        if not abs(other.average_box_size - self.average_box_size) < 1e-6: return False
+        if not np.array_equal(other.permeants, self.permeants): return False
+        if not np.array_equal(np.concatenate(other.chains), np.concatenate(self.chains)): return False
+        if other.num_z_bins != self.num_z_bins: return False
+        if not np.array_equal(other.com_selection, self.com_selection): return False
+        if not np.array_equal(other.counts, self.counts): return False
+        return True
 
     def save(self, filename):
-        pass
+        probabilities = self.probabilities
+        probabilities_iii = [self.bins]
+        for i in range(self.num_chains):
+            probabilities_iii.append(probabilities.T[tuple(i for _ in range(self.num_neighbors))])
+        probabilities_iii.append(-np.sum(np.array(probabilities_iii)[1:], axis=0) + 1.0)
+        header = ("{:<9}" * (self.num_chains+2)).format(
+            *(['z'] + ['{}xChain{}'.format(self.num_neighbors, i) for i in range(self.num_chains)] + ['other']))
+        np.savetxt(filename, np.column_stack(probabilities_iii), fmt="%.6f",
+                   header='Probabilities for nearest neighbors\n' + header)
+        with open(filename + '.pic', 'wb') as fp:
+            pickle.dump(self, fp)
 
     @property
     def probabilities(self):
-        pass
+        probabilities = self.counts
+        normalization = np.sum(probabilities, axis=tuple(np.arange(1, 1+self.num_neighbors)))
+        probabilities = (probabilities.T / normalization).T  # transpose, as division is over last axis
+        return probabilities
 
     @staticmethod
-    def from_file(filename):
-        pass
+    def from_pickle_file(filename):
+        with open(filename, 'rb') as fp:
+            return pickle.load(fp)
 
     @staticmethod
     def cartesian_product(*arrays):
