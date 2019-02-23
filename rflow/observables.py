@@ -108,13 +108,13 @@ class BinEdgeUpdater(object):
 
     @property
     def edges(self):
-        return np.linspace(0.0, self.average_box_height,
-                           self.average_box_height/self.num_bins, endpoint=True)
+        return np.linspace(0.0, self.average_box_size,
+                           self.num_bins+1, endpoint=True)
 
     @property
     def edges_around_zero(self):
-        return np.linspace(-0.5*self.average_box_height, 0.5*self.average_box_height,
-                           self.average_box_height/self.num_bins, endpoint=True)
+        return np.linspace(-0.5*self.average_box_size, 0.5*self.average_box_size,
+                           self.num_bins+1, endpoint=True)
 
     @property
     def bin_centers_around_zero(self):

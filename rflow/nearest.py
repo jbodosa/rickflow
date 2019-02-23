@@ -136,7 +136,7 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
 
     def save(self, filename):
         probabilities = self.probabilities
-        probabilities_iii = [self.bins]
+        probabilities_iii = [self.bin_centers_around_zero]
         for i in range(self.num_chains):
             probabilities_iii.append(probabilities.T[tuple(i for _ in range(self.num_neighbors))])
         probabilities_iii.append(-np.sum(np.array(probabilities_iii)[1:], axis=0) + 1.0)
