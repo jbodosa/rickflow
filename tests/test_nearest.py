@@ -23,10 +23,10 @@ def nna(traj):
     chol_chain_atoms = traj.topology.select("resname CHL1 and (name =~ 'C.*')")
     membrane = traj.topology.select("resname PSM or resname POPC or resname CHL1")
     water_oxygen = traj.topology.select("water and mass > 15")
-
     nna = NearestNeighborAnalysis(
         permeants=water_oxygen[:5], # for testing only few atoms
         chains=[water_oxygen, psm_chain_atoms, popc_chain_atoms, chol_chain_atoms],
+        num_residues_per_chain=[20487, 128, 386, 44],
         com_selection=membrane,
         num_z_bins=10
     )

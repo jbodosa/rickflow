@@ -23,13 +23,14 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
     chain atoms.
     """
 
-    def __init__(self, permeants, chains, num_z_bins=50,
+    def __init__(self, permeants, chains, num_residues_per_chain, num_z_bins=50,
                  num_neighbors=3, com_selection=None):
         """
         """
         # input arguments
         self.permeants = permeants
         self.chains = chains
+        self.num_residues_per_chain = num_residues_per_chain
         self.num_z_bins = num_z_bins
         self.num_neighbors = num_neighbors
         self.com_selection = com_selection
@@ -42,16 +43,22 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
         self.bins = np.arange(bin_width, 1.0 + bin_width, bin_width)
         self.num_permeants = len(self.permeants)
         self.num_chains = len(self.chains)
+        assert len(num_residues_per_chain) == len(chains)
+        assert all([len(chains[i]) % num_residues_per_chain[i] == 0 for i in range(len(chains))])
+        self.num_atoms_per_residue = [len(chains[i]) // num_residues_per_chain[i] for i in range(len(chains))]
+        self.total_num_residues = sum(self.num_residues_per_chain)
 
         self.chain_atoms = np.concatenate(chains)
         self.num_chain_atoms = len(self.chain_atoms)
+        self.num_atoms_per_chain = [self.num_residues_per_chain[i] * self.num_atoms_per_residue[i]
+                                    for i in range(self.num_chains)]
 
-        # build a lookup-table that gives the chain id for each atom_id, where
-        # atom_id is a chain atom's index (return -1, if atom_id is not a chain atom)
-        self.chain_id = np.zeros(np.max(self.chain_atoms) + 1, dtype=int)
+        # build a lookup-table that gives the chain id for each residue_id, where
+        # residue_id is a residue's index (return -1, if residue_id is not a valid residue)
+        self.chain_id = np.zeros(self.total_num_residues, dtype=int)
         self.chain_id[:] = -1
-        for i, chain in enumerate(chains):
-            self.chain_id[chain] = i
+        for i in range(self.num_chains):
+            self.chain_id[sum(self.num_residues_per_chain[:i]):sum(self.num_residues_per_chain[:i+1])] = i
 
         # build all pairs of permeant and chain atoms [id of a permeant atom, id of a chain atom]
         # because we need to calculate the distance between these pairs for every trajectory frame
@@ -82,16 +89,24 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
         # permeant_id enumerates the permeant atoms starting at 0, 1, ...
         # and chain_atom_id enumerates all chain atoms starting at 0, 1, ...
         distances_reshaped = distances.reshape((self.num_permeants, self.num_chain_atoms))
-        # partition the chain indices in each row (i.e. for each permeant atom)
+        distances_to_residue_in_chain = []
+        for i in range(self.num_chains):
+            distances_per_residue = distances_reshaped[
+                                    :, sum(self.num_atoms_per_chain[:i]):sum(self.num_atoms_per_chain[:i+1])].reshape(
+                (self.num_permeants, self.num_residues_per_chain[i], self.num_atoms_per_residue[i]))
+            distances_to_residue_in_chain.append(np.min(distances_per_residue, axis=2))
+        distances_to_residues = np.column_stack(distances_to_residue_in_chain)
+
+        # partition the residue indices in each row (i.e. for each permeant atom)
         # partitioning means that the k-th smallest number in the array will be at position k
         # in the partitioned array. All smaller numbers are left, all larger numbers right
         # of position k. The function np.argpartition returns the indices that the array
         # would have after partitioning, not the partitioned array itself (like argsort vs. sort).
-        partitioned_chain_indices = np.argpartition(distances_reshaped, axis=1, kth=self.num_neighbors)
-        # get the indices of the closest chain atoms
-        k_nearest_chain_indices = partitioned_chain_indices[:, :self.num_neighbors]
-        # get the chain ids for the closest chain atoms
-        k_nearest_chains = self.chain_id[self.chain_atoms[k_nearest_chain_indices]]
+        partitioned_residue_indices = np.argpartition(distances_to_residues, axis=1, kth=self.num_neighbors)
+        # get the indices of the closest residues
+        k_nearest_residue_indices = partitioned_residue_indices[:, :self.num_neighbors]
+        # get the chain ids for the closest residues
+        k_nearest_chains = self.chain_id[k_nearest_residue_indices]
         # sorting assures that, e.g., indices [0,0,1] and [1,0,0], are treated as equivalent
         k_nearest_chains.sort(axis=1)
         # building the indices, for which self.counts is going to be incremented.
