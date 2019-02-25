@@ -1,5 +1,5 @@
 
-from rflow.nearest import NearestNeighborAnalysis
+from rflow.nearest import NearestNeighborAnalysis, NearestNeighborResult
 
 import os
 from copy import deepcopy
@@ -28,7 +28,7 @@ def nna(traj):
         chains=[water_oxygen, psm_chain_atoms, popc_chain_atoms, chol_chain_atoms],
         num_residues_per_chain=[20487, 128, 386, 44],
         com_selection=membrane,
-        num_z_bins=10
+        num_bins=10
     )
     nna(traj)
     return nna
@@ -41,40 +41,50 @@ def test_nna(nna):
 
 
 def test_probabilities(nna):
-    assert nna.probabilities.shape == nna.counts.shape
+    assert nna.result.probabilities.shape == nna.counts.shape
 
 
 def test_nna_save_load_eq(nna, tmpdir):
     filename = os.path.join(str(tmpdir), 'nna.txt')
-    nna.save(filename)
+    nna.result.save(filename)
     assert os.path.isfile(filename)
-    assert os.path.isfile(filename + ".pic")
-    nna2 = NearestNeighborAnalysis.from_pickle_file(filename + ".pic")
-    assert nna == nna2
-    nna2.counts[0,0,0,0] += 1
-    assert nna != nna2
+    nnares2 = NearestNeighborResult.from_file(filename)
+    assert nna.result == nnares2
+    nnares2.counts[0,0,0,0] += 1
+    assert nna != nnares2
 
 
 def text_inherited_quantities(nna, traj):
     assert hasattr(nna, 'edges')
     zlength = traj.unitcell_lengths[0,2]
-    assert len(nna.edges) == nna.num_z_bins + 1
+    assert len(nna.edges) == nna.num_bins + 1
     assert nna.average_box_size == zlength
 
 
-def test_add(nna):
-    nna2 = deepcopy(nna)
-    nna2.counts[0,0,0,0] += 1
-    nna2.n_frames += 1
-    nna_sum = nna + nna2
-    assert np.array_equal(nna_sum.counts, nna.counts + nna2.counts)
+def test_radd(nna):
+    nnares1 = nna.result
+    nnares2 = deepcopy(nna.result)
+    nnares2.counts[0,0,0,0] += 1
+    nnares2.n_frames += 1
+    nna_sum = deepcopy(nnares1)
+    nna_sum += nnares2
+    assert np.array_equal(nna_sum.counts, nnares1.counts + nnares2.counts)
     # check if box size was updated
     assert nna_sum.n_frames == 3
     assert nna_sum.average_box_size == pytest.approx(
-        1./3. * (nna.average_box_size + 2 * nna2.average_box_size)
+        1./3. * (nnares1.average_box_size + 2 * nnares2.average_box_size)
     )
 
 
 def test_sum(nna):
-    nna2 = deepcopy(nna)
-    sum([nna, nna2])
+    nnares1 = nna.result
+    nnares2 = deepcopy(nna.result)
+    nnares2.counts[0,0,0,0] += 1
+    nnares2.n_frames += 1
+    nna_sum = sum([nnares1, nnares2])
+    assert np.array_equal(nna_sum.counts, nnares1.counts + nnares2.counts)
+    # check if box size was updated
+    assert nna_sum.n_frames == 3
+    assert nna_sum.average_box_size == pytest.approx(
+        1./3. * (nnares1.average_box_size + 2 * nnares2.average_box_size)
+    )
