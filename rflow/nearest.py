@@ -100,6 +100,16 @@ class NearestNeighborResult(BinEdgeUpdater):
         probabilities = (probabilities.T / normalization).T  # transpose, as division is over last axis
         return probabilities
 
+    def coarsen(self, num_bins):
+        if not self.num_bins % num_bins == 0:
+            raise NearestNeighorException("num_bins has to be a divisor of this result's number of bins.")
+        #                            retain shape of all but bin axis  ----   last axis is going to be summed over
+        transposed_new_shape = tuple(list(self.counts.shape[-1:0:-1]) + [num_bins, self.num_bins // num_bins])
+        coarsened_counts = np.sum(np.reshape(self.counts.T, transposed_new_shape).T, axis=0)
+        return NearestNeighborResult(
+            num_bins, self.average_box_size, self.n_frames, coarsened_counts
+        )
+
 
 class NearestNeighborAnalysis(BinEdgeUpdater):
     """This class runs a very specific nearest neighbor analysis in a heterogeneous membrane.

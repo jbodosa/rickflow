@@ -1,5 +1,5 @@
 
-from rflow.nearest import NearestNeighborAnalysis, NearestNeighborResult
+from rflow.nearest import NearestNeighborAnalysis, NearestNeighborResult, NearestNeighorException
 
 import os
 from copy import deepcopy
@@ -88,3 +88,12 @@ def test_sum(nna):
     assert nna_sum.average_box_size == pytest.approx(
         1./3. * (nnares1.average_box_size + 2 * nnares2.average_box_size)
     )
+
+
+def test_coarsen(nna):
+    nnr_fine = nna.result
+    with pytest.raises(NearestNeighorException):
+        nnr_fine.coarsen(11)
+    nnr_coarse = nna.result.coarsen(2)
+    assert nnr_coarse.counts.shape == (2, 4, 4, 4)
+    assert nnr_coarse.counts[0,0,0,0] == np.sum(nnr_fine.counts[:5,0,0,0])
