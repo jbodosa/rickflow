@@ -90,3 +90,39 @@ class Coordinates(object):
         else:
             return traj.xyz[:, self.atom_ids, self.coordinates]
 
+
+class BinEdgeUpdater(object):
+    """A class that keeps track of bins along one axis, with respect to the average box size.
+    """
+    def __init__(self, num_bins=100, coordinate=2):
+        self.num_bins = num_bins
+        self.coordinate = coordinate
+        self.average_box_size = 0.0
+        self.n_frames = 0
+
+    def __call__(self, traj):
+        box_size = traj.unitcell_lengths[:, self.coordinate]
+        self.average_box_size = self.n_frames * self.average_box_size + traj.n_frames * box_size.mean()
+        self.n_frames += traj.n_frames
+        self.average_box_size /= self.n_frames
+
+    @property
+    def edges(self):
+        return np.linspace(0.0, self.average_box_size,
+                           self.num_bins+1, endpoint=True)
+
+    @property
+    def edges_around_zero(self):
+        return np.linspace(-0.5*self.average_box_size, 0.5*self.average_box_size,
+                           self.num_bins+1, endpoint=True)
+
+    @property
+    def bin_centers_around_zero(self):
+        edges = self.edges_around_zero
+        return 0.5*(edges[:-1] + edges[1:])
+
+    @property
+    def bin_centers(self):
+        edges = self.edges
+        return 0.5*(edges[:-1] + edges[1:])
+
