@@ -1,5 +1,5 @@
 """
-
+This module contains a neighbor analysis for permeants through a heterogeneous lipid bilayer.
 """
 
 import pickle
@@ -16,7 +16,27 @@ class NearestNeighorException(RickFlowException):
 
 
 class NearestNeighborResult(BinEdgeUpdater):
-    def __init__(self, num_bins,  average_box_size, n_frames, counts):
+    """Result of a nearest neighbor analysis. This object is created by the NearestNeighborAnalysis class
+    and can usually be accessed as NearestNeighborAnalysis.result.
+
+    This class supports addition, testing for equality, saving and loading results, converting counts to probabilities,
+    as well as reducing the number of bins:
+    - Adding two instances will sum up the counts and n_frames, and average the box size.
+
+    Properties:
+        probabilities (numpy.array): The probability of finding a certain neighbor configuration in a bin,
+            divided by the probability of finding a permeant in the bin (probabilities sum up to 1 in each bin).
+    """
+    def __init__(self, num_bins, average_box_size, n_frames, counts):
+        """
+        Args:
+            num_bins (int): number of bins in the z direction (bilayer normal)
+            average_box_size(float): average box height in the z direction
+            n_frames (int): number of trajectory frames that were analyzed to get this result
+            counts (numpy array): the number of tuples of neighbors for each class of permeants and bin in
+                the z-direction. E.g., the element `counts[4][2][2][0]` stores the number of occurences,
+                where the three nearest residues of a permeant in bin nr. 4 were of chaintype 2,2, and 0.
+        """
         # initialize the parent object that keeps track of bin centers and bin edges
         super(NearestNeighborResult, self).__init__(num_bins, coordinate=2)
         self.average_box_size = average_box_size
@@ -63,6 +83,13 @@ class NearestNeighborResult(BinEdgeUpdater):
 
     @staticmethod
     def from_file(filename):
+        """Load a result from file
+        Args:
+            filename (str): The file that contains the data.
+
+        Returns:
+            A NearestNeighborResult instance.
+        """
         with open(filename, 'r') as fp:
             header_line_2 = fp.readlines()[1].replace('#', '').strip()
             header_dictionary = eval(header_line_2)
@@ -77,6 +104,11 @@ class NearestNeighborResult(BinEdgeUpdater):
         return NearestNeighborResult(num_bins,  average_box_size, n_frames, counts_reshaped)
 
     def save(self, filename):
+        """Save this result to a (human-readable) file.
+
+        Args:
+            filename (str): The filename to write to.
+        """
         header_dictionary = {
             'num_bins': self.num_bins,
             'average_box_size': self.average_box_size,
@@ -101,6 +133,15 @@ class NearestNeighborResult(BinEdgeUpdater):
         return probabilities
 
     def coarsen(self, num_bins):
+        """Coarsen the bin discretization.
+
+        Args:
+            num_bins (int): The number of bins of the new instance.
+                Has to be a divisor of this instance's number of bins.
+
+        Returns:
+            A new NearestNeighborResult instance with the specified number of bins.
+        """
         if not self.num_bins % num_bins == 0:
             raise NearestNeighorException("num_bins has to be a divisor of this result's number of bins.")
         #                            retain shape of all but bin axis  ----   last axis is going to be summed over
@@ -117,10 +158,26 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
     For some permeant molecules, it finds the nearest neighboring lipid chain atoms.
     For example, for a bilayer containing PSM, POPC, and cholesterol, it figures out the closest
     chain atoms.
+
+    The analysis is run by calling this class as a function with an mdtraj trajectory as an argument.
+
+    Properties:
+        result (instance of NearestNeighborResult): Returns the result in a form that can be saved, added, etc.
+
+
     """
-    def __init__(self, permeants, chains, num_residues_per_chain, num_bins=50,
+    def __init__(self, permeants, chains, num_residues_per_chain, num_bins=120,
                  num_neighbors=3, com_selection=None):
         """
+        Args:
+            permeants(list or np.array of int): List of the permeant's atom ids.
+            chains(list (or np.array) of list (or np.array) of int): Each item of the list is a list of lipid atom ids.
+                Each list specifies a different chain type.
+            num_residues_per_chain (list of int): Number of residues per chain for each chain type. Has to have the
+                same length as `chains`.
+            num_bins (int): The number of bins in the z direction.
+            num_neighbors (int): The number of nearest neighbors that should be stored for each permeant.
+            com_selection (list or np.array of int): All membrane atom ids, to define the membrane's center of mass.
         """
         # input arguments
         self.permeants = permeants
@@ -176,6 +233,11 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
             self.call_on_frame(frame)
 
     def call_on_frame(self, frame):
+        """Process the nearest neighbor analysis for one frame.
+
+        Args:
+            frame: An mdtraj trajectory containing one frame.
+        """
         # update bin centers and bin edges
         super(NearestNeighborAnalysis, self).__call__(frame)
         # normalize z axis and categorize z coordinates into bins
@@ -188,6 +250,7 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
         # permeant_id enumerates the permeant atoms starting at 0, 1, ...
         # and chain_atom_id enumerates all chain atoms starting at 0, 1, ...
         distances_reshaped = distances.reshape((self.num_permeants, self.num_chain_atoms))
+        # find the minimum distance of each permeant to each chain residue
         distances_to_residue_in_chain = []
         for i in range(self.num_chains):
             distances_per_residue = distances_reshaped[
@@ -216,6 +279,14 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
 
     @staticmethod
     def cartesian_product(*arrays):
+        """Helper function that returns the cartesian product of multiple arrays.
+
+        Args:
+            *arrays: Any number of arrays.
+
+        Returns:
+            cartesian_product (numpy.array): The cartesian product of the input arrays.
+        """
         la = len(arrays)
         dtype = np.result_type(*arrays)
         arr = np.empty([len(a) for a in arrays] + [la], dtype=dtype)
@@ -225,7 +296,15 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
 
     @staticmethod
     def increment_using_multiindices(array, index_array):
-        """
+        """Increment the array by 1 at all multiindices defined in index_array.
+
+        Args:
+            array (numpy.array): A (possibly highdimensional) array
+            index_array (numpy.array): A two-dimensional array, whose rows specify multiindices.
+
+        Returns:
+            incremented_array (numpy.array): A copy of the input array, where 1 has been added at each index from
+                the index_array.
         """
         unfolded_array = np.ravel(array)
         unfolded_indices = np.ravel_multi_index(index_array.T, array.shape)
