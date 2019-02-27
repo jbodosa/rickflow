@@ -62,4 +62,23 @@ def mydigitize(array, nbins, range):
     Returns:
 
     """
-    pass
+    raise NotImplementedError
+
+
+def increment_using_multiindices(array, index_array):
+    """Increment an array by 1 at all multiindices defined in index_array.
+
+    If a multiindex occurs multiple times in the index array, the element is incremented multiple times.
+    
+    Args:
+        array (numpy.array): A (possibly highdimensional) array
+        index_array (numpy.array): A two-dimensional array, whose rows specify multiindices.
+
+    Returns:
+        incremented_array (numpy.array): A copy of the input array, where 1 has been added at each index from
+            the index_array.
+    """
+    unfolded_array = np.ravel(array)
+    unfolded_indices = np.ravel_multi_index(index_array.T, array.shape)
+    np.add.at(unfolded_array, unfolded_indices, 1)
+    return np.reshape(unfolded_array, array.shape)

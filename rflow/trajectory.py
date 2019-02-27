@@ -18,9 +18,23 @@ from rflow.utility import selection
 
 
 class CharmmTrajectoryIterator(object):
+    """An iterator that runs over trajectory files.
+
+    For trajectory files that were created using the rickflow workflow, the class
+    is used as follows:
+
+    >>> trajectories = CharmmTrajectoryIterator()
+    >>> for traj in trajectories:
+    >>>     ...
+
+    Analysis classes in the rflow package are written so that they can be iteratively
+    called on trajectories. For example, for assembling transition matrices, call:
+
+    >>>
+    """
     def __init__(self, first_sequence=None, last_sequence=None,
                  filename_template="trj/dyn{}.dcd", topology_file="system.pdb",
-                 selection="all"):
+                 selection="all", load_function=md.load_dcd):
 
         # select sequences
         trajectory_files = glob.glob(filename_template.format("*"))
@@ -57,11 +71,13 @@ class CharmmTrajectoryIterator(object):
         else:
             self.selection = selection
 
+        self.load_function = load_function
+
     def __iter__(self):
         for i in range(self.first, self.last + 1):
-            trajectory = md.load_dcd(self.filename_template.format(i),
-                                     top=self.topology,
-                                     atom_indices=self.selection)
+            trajectory = self.load_function(self.filename_template.format(i),
+                                            top=self.topology,
+                                            atom_indices=self.selection)
             trajectory.i = i
             yield trajectory
 
