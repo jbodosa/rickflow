@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
 
+"""
+Analysis tools for diffusivity and membrane permeation.
+"""
+
+
 from warnings import warn
 import pickle
 
 import numpy as np
 
 import mdtraj as md
+from simtk import unit as u
 
-from rflow.utility import selection
+from rflow.utility import selection, increment_using_multiindices
 from rflow.trajectory import normalize
 from rflow.exceptions import RickFlowException
 
@@ -15,14 +21,16 @@ from rflow.exceptions import RickFlowException
 class TransitionCounter(object):
     """
     A class to extract transitions matrices.
-    Example usage:
 
-    >>> from rickflow import CharmmTrajectoryIterator as TI
-    >>> trans_counter = TransitionCounter([10,20], 10, [0,1,2,3])
-    >>> for frame in TI():
-    >>>     trans_counter(frame)
-    >>> print(frame.matrices)
+    Examples:
 
+        Usage on trajectories that have been created using the rflow standard protocol:
+
+        >>> from rickflow import CharmmTrajectoryIterator as TI
+        >>> trans_counter = TransitionCounter([10,20], 10, [0,1,2,3])
+        >>> for frame in TI():
+        >>>     trans_counter(frame)
+        >>> print(frame.matrices)
     """
     def __init__(self, lag_iterations, num_bins, solute, membrane=None):
         self.lag_iterations = lag_iterations
@@ -67,10 +75,9 @@ class TransitionCounter(object):
             # add to transition matrices
             for lag in self.lag_iterations:
                 if self.fifo_positions[lag] is not None:
-                    # TODO: Replace by np.add.at
-                    for i, j in zip(self.fifo_positions[0],
-                                    self.fifo_positions[lag]):
-                        self.matrices[lag][i, j] += 1
+                    increment_using_multiindices(
+                        self.matrices[lag],
+                        np.column_stack([self.fifo_positions[0],self.fifo_positions[lag]]))
 
     def save_matrices(self, filename_template):
         try:
@@ -85,9 +92,26 @@ class TransitionCounter(object):
 
 
 class PermeationEventCounter(object):
-
+    """Class to count permeation events (permeants entering/exiting/crossing a membrane).
+    """
     def __init__(self, solute_ids, dividing_surface, center_threshold=0.02, membrane=None,
                  initialize_all_permeants=True):
+        """
+        Args:
+            solute_ids (list of int): The permeant's atom ids.
+            dividing_surface (float): Placement of the dividing surface that separates the water phase from the
+                membrane. The dividing surface is specified relative to the height of the system,
+                as a distance from the center (thus it must be a number between 0.0 and 0.5).
+            center_threshold (float): Placement of the dividing surface that separates the central membrane region
+                from the outer membrane. The dividing surface is specified relative to the height of the system,
+                as a distance from the center (thus it must be a number between 0.0 and 0.5). In order to be counted
+                as crossings, permeants have to enter the central region and exit to the water region on the opposite
+                side.
+            membrane (list or np.array of ints): The membrane's atom ids (required to properly center the system).
+            initialize_all_permeants (bool): If true, the permeants in the membrane are initialized as having made
+                half a crossing already. Setting this to False can lead to dramatic underestimates of the permeability,
+                especially for lipid-soluble permeants.
+        """
         self.center_threshold = center_threshold
         self.dividing_surface = dividing_surface
 
@@ -102,6 +126,22 @@ class PermeationEventCounter(object):
         # bin 4: second outer membrane bin
         # bin 5: second donor/acceptor bin
         # bin 6: control bin at the second edge of the periodic boundary
+
+        #  dividing_surface:   |<------------>|
+        #  center_threshold:             |<-->|
+        #  |                                  |                                  |
+        # 0.0                                0.5                                1.0
+        #  |                                  |                                  |
+        #  |---------|---------|---------|---------|---------|---------|---------|
+        #       0         1         2         3         4         5         6
+        #                      OX=~~~~~~~~~~~~ ~~~~~~~~~~~~=XO
+        #                      OX=~~~~~~~~~~~~ ~~~~~~~~~~~~=XO
+        #          WATER                   MEMBRANE                   WATER
+        #                      OX=~~~~~~~~~~~~ ~~~~~~~~~~~~=XO
+        #                      OX=~~~~~~~~~~~~ ~~~~~~~~~~~~=XO
+        #  |---------|---------|---------|---------|---------|---------|---------|
+        #
+        #
         self.functional_bins = [1, 3, 5]
         self.startframe = 0
         self.solute_ids = solute_ids
@@ -123,6 +163,7 @@ class PermeationEventCounter(object):
                                             dtype=np.int32)
         self.events = []
         self.initialize_all_permeants = initialize_all_permeants
+        self.critical_transitions = self.make_critical_transitions()
 
     @property
     def num_crossings(self):
@@ -132,50 +173,31 @@ class PermeationEventCounter(object):
         return n
 
     def _sanity_check(self, z_digitized_i, frame):
-        # sanity check: transitions should occur only between adjacent bins
+        # sanity check: particles should not hop over two or more bin
+        # neither should they hop over the central bin
         if self.previous_z_digitized is not None:
-            transition_step_size = np.mod(
-                np.absolute(z_digitized_i - self.previous_z_digitized),
-                len(self.bins) - 1
-            )
-            # print(transition_step_size)
-            too_fast_particles = np.where(transition_step_size > 1)[0]
-            # print(too_fast_particles, bool(too_fast_particles))
-            if too_fast_particles.size > 0:
-                message = (
-                    "An infeasible transition was detected for particles {} "
-                    "in trajectory frame {}.".format(
-                        [self.solute_ids[i] for i in too_fast_particles],
-                        frame
-                    )
-                )
-                is_critical = np.any(
-                    np.isin(z_digitized_i[too_fast_particles], [2, 3, 4]))
-                if is_critical:
-                    message += (
-                    " This might have been a "
-                    "transit through the bilayer."
-                    "You should save your simulation "
-                    "output more frequently or increase the "
-                    "center_threshold.")
-                    warn(message)
-
-        self.previous_z_digitized = z_digitized_i
+            critical_transitions = np.where(self.critical_transitions[self.previous_z_digitized, z_digitized_i])[0]
+            if critical_transitions.any():
+                for i in critical_transitions:
+                    warn("An infeasible transition was detected for particle {} in trajectory frame {} (bin {} to {})."
+                         " This might or might not have been a transit through the bilayer. It is not counted as a"
+                         " permeation event.".format(self.solute_ids[i], frame, self.previous_z_digitized[i],
+                                                     z_digitized_i[i]))
+        self.previous_z_digitized = np.copy(z_digitized_i)
 
     def __call__(self, trajectory):
         z_normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
 
         # find bin indices
         z_digitized = np.digitize(z_normalized, self.bins)
-
         # initialize flags for all permeants
         if self.initialize_all_permeants:
             if (-999999 in self.last_functional_bin) or (-999999 in self.last_water_bin):
-                self.last_functional_bin = z_digitized
-                self.last_functional_bin[np.where[np.isin(self.last_functional_bin, [0,1,2])]] = 1
-                self.last_functional_bin[np.where[np.isin(self.last_functional_bin, [4,5,6])]] = 5
+                self.last_functional_bin = np.copy(z_digitized[0])
+                self.last_functional_bin[np.where(np.isin(self.last_functional_bin, [0,1,2]))] = 1
+                self.last_functional_bin[np.where(np.isin(self.last_functional_bin, [4,5,6]))] = 5
                 assert np.isin(self.last_functional_bin, self.functional_bins).all()
-                self.last_water_bin = (z_normalized < 0.5)*1 + (z_normalized >= 0.5)*5
+                self.last_water_bin[:] = (z_normalized[0] < 0.5)*1 + (z_normalized[0] >= 0.5)*5
 
         for i in range(trajectory.n_frames):
             frame = self.startframe + i
@@ -198,37 +220,37 @@ class PermeationEventCounter(object):
                 if last_w_bin == -999999:
                     continue
 
-                from_w_bin_time = frame - self.framenr_of_last_seen_in_functional_bin[last_w_bin][
-                    particle]
+                from_w_bin_time = frame - self.framenr_of_last_seen_in_functional_bin[last_w_bin][particle]
                 event = {
                     "frame": frame,
                     "from_water": last_w_bin,
                     "atom": self.solute_ids[particle]
                 }
-                if self.last_functional_bin[
-                    particle] == 3:  # enter water from center
-                    exit_time = frame - self.framenr_of_last_seen_in_functional_bin[3][
-                                    particle]
-                    event["exit_time_nframes"] = exit_time
+                if self.last_functional_bin[particle] == 3:  # enter water from center
+                    if self.framenr_of_last_seen_in_functional_bin[3][particle] != -999999:
+                        exit_time = frame - self.framenr_of_last_seen_in_functional_bin[3][
+                                        particle]
+                        event["exit_time_nframes"] = exit_time
                     if self.last_water_bin[particle] == z_digitized[i][
                         particle]:
                         # rebound
                         event["type"] = "rebound"
-                        event["rebound_time_nframes"] = from_w_bin_time
+                        if self.framenr_of_last_seen_in_functional_bin[last_w_bin][particle] != -999999:
+                            event["rebound_time_nframes"] = from_w_bin_time
                     else:  # crossing
                         assert abs(
                             self.last_water_bin[particle] - z_digitized[i][
                                 particle]) == 4
-                        crossing_time = \
-                        self.framenr_of_last_seen_in_functional_bin[
-                            z_digitized[i][particle]][particle]
+
                         event["type"] = "crossing"
-                        event["crossing_time_nframes"] = from_w_bin_time
+                        if self.framenr_of_last_seen_in_functional_bin[last_w_bin][particle] != -999999:
+                            event["crossing_time_nframes"] = from_w_bin_time
                 else:
                     assert z_digitized[i][particle] == 3
                     # entry
                     event["type"] = "entry"
-                    event["entry_time_nframes"] = from_w_bin_time
+                    if self.framenr_of_last_seen_in_functional_bin[last_w_bin][particle] != -999999:
+                        event["entry_time_nframes"] = from_w_bin_time
                 self.events += [event]
 
             # update
@@ -241,6 +263,68 @@ class PermeationEventCounter(object):
 
         # finalize
         self.startframe += trajectory.n_frames
+
+    @staticmethod
+    def make_critical_transitions():
+        critical_transitions = np.ones((7, 7), dtype=bool)
+        for i in range(7):
+            # transitions from bin i to bin i are not critical
+            critical_transitions[i, i] = False
+            # transitions from bin i to bin i+1 are not critical
+            critical_transitions[i, i-1] = False
+            critical_transitions[i-1, i] = False
+            # most hops over one bin are not critical
+            critical_transitions[i, i-2] = False
+            critical_transitions[i-2, i] = False
+        # The only critical hop is the one over the central bin
+        critical_transitions[2,4] = True
+        critical_transitions[4,2] = True
+        return critical_transitions
+
+    def permeability(self, permeant_distribution, start_frame=0, end_frame=None,
+                     time_between_frames=1*u.picosecond, mode='crossings', num_bins_in_water=2):
+        return self.calculate_permeability(
+            self.events, permeant_distribution, num_permeants=len(self.solute_ids),
+            start_frame=start_frame, end_frame=end_frame,
+            time_between_frames=time_between_frames, mode=mode,
+            num_bins_in_water=num_bins_in_water)
+
+    @staticmethod
+    def calculate_permeability(events, permeant_distribution, num_permeants=None, start_frame=0, end_frame=None,
+                               time_between_frames=1*u.picosecond, mode='crossings', num_bins_in_water=2):
+        # try to set default arguments
+        if end_frame is None:
+            end_frame = permeant_distribution.n_frames
+        if num_permeants is None:
+            num_permeants = len(permeant_distribution.atom_selection)
+        # initialize chosen counting method
+        if mode == 'crossings':
+            factor = 2.0
+            counted_events = ["crossing"]
+        elif mode == 'rebounds':
+            factor = 4.0
+            counted_events = ["crossing", "rebound"]
+        elif mode == 'semi-permeation':
+            factor = 8.0
+            counted_events = ["crossing", "rebound", "entry"]
+        else:
+            raise RickFlowException("mode has to be 'crossings', 'rebounds', or 'semi-permeation'")
+        # count permeation events
+        num_events = 0
+        for event in events:
+            if (event["type"] in counted_events) and (event["frame"] >= start_frame) and (event["frame"] <= end_frame):
+                num_events += 1
+        # get simulated time
+        tsim = (end_frame - start_frame + 1) * time_between_frames
+        # normalize free energy to be zero in the water
+        free_energy = permeant_distribution.free_energy
+        water_free_energy = np.mean(free_energy[:num_bins_in_water].tolist() + free_energy[-num_bins_in_water:].tolist())
+        free_energy -= water_free_energy
+        # integrate free energy
+        fe_integral = (permeant_distribution.average_box_size * u.nanometer * np.mean(
+                       [0.5*free_energy[0]] + free_energy[1:-1].tolist() + [0.5*free_energy[-1]]))
+        # Calculate permeability
+        return (fe_integral / (factor*num_permeants) * (num_events / tsim)).value_in_unit(u.centimeter/u.second)
 
 
 class Distribution(object):
@@ -304,3 +388,5 @@ class Distribution(object):
     def load_from_pic(filename):
         with open(filename, 'rb') as pic:
             return pickle.load(pic)
+
+

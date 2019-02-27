@@ -8,7 +8,7 @@ from copy import copy
 import numpy as np
 import mdtraj as md
 
-from rflow import normalize, BinEdgeUpdater, RickFlowException
+from rflow import normalize, BinEdgeUpdater, RickFlowException, increment_using_multiindices
 
 
 class NearestNeighorException(RickFlowException):
@@ -275,7 +275,7 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
         # each index is an array [z_index, chain_index1, chain_index2, ... ],
         # where chain_index1 <= chain_index2 <= ...
         count_indices = np.column_stack([z_digitized.T, k_nearest_chains])
-        self.counts = self.increment_using_multiindices(self.counts, count_indices)
+        self.counts = increment_using_multiindices(self.counts, count_indices)
 
     @staticmethod
     def cartesian_product(*arrays):
@@ -293,20 +293,3 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
         for i, a in enumerate(np.ix_(*arrays)):
             arr[..., i] = a
         return arr.reshape(-1, la)
-
-    @staticmethod
-    def increment_using_multiindices(array, index_array):
-        """Increment the array by 1 at all multiindices defined in index_array.
-
-        Args:
-            array (numpy.array): A (possibly highdimensional) array
-            index_array (numpy.array): A two-dimensional array, whose rows specify multiindices.
-
-        Returns:
-            incremented_array (numpy.array): A copy of the input array, where 1 has been added at each index from
-                the index_array.
-        """
-        unfolded_array = np.ravel(array)
-        unfolded_indices = np.ravel_multi_index(index_array.T, array.shape)
-        np.add.at(unfolded_array, unfolded_indices, 1)
-        return np.reshape(unfolded_array, array.shape)
