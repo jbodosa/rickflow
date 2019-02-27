@@ -320,9 +320,10 @@ class PermeationEventCounter(object):
         free_energy = permeant_distribution.free_energy
         water_free_energy = np.mean(free_energy[:num_bins_in_water].tolist() + free_energy[-num_bins_in_water:].tolist())
         free_energy -= water_free_energy
+        exponential = np.exp(-free_energy)
         # integrate free energy
         fe_integral = (permeant_distribution.average_box_size * u.nanometer * np.mean(
-                       [0.5*free_energy[0]] + free_energy[1:-1].tolist() + [0.5*free_energy[-1]]))
+                       [0.5*exponential[0]] + exponential[1:-1].tolist() + [0.5*exponential[-1]]))
         # Calculate permeability
         return (fe_integral / (factor*num_permeants) * (num_events / tsim)).value_in_unit(u.centimeter/u.second)
 

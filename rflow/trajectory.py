@@ -81,6 +81,9 @@ class CharmmTrajectoryIterator(object):
             trajectory.i = i
             yield trajectory
 
+    def __len__(self):
+        return self.last - self.first + 1
+
 
 def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
     """
