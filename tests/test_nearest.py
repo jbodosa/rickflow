@@ -3,6 +3,7 @@ from rflow.nearest import NearestNeighborAnalysis, NearestNeighborResult, Neares
 
 import os
 from copy import deepcopy
+import warnings
 import numpy as np
 import mdtraj as md
 
@@ -41,7 +42,7 @@ def test_nna(nna):
 
 
 def test_probabilities(nna):
-    assert nna.result.probabilities.shape == nna.counts.shape
+    assert nna.result.coarsen(2).probabilities.shape[1:] == nna.counts.shape[1:]
 
 
 def test_nna_save_load_eq(nna, tmpdir):
@@ -98,8 +99,3 @@ def test_coarsen(nna):
     assert nnr_coarse.counts.shape == (2, 4, 4, 4)
     assert nnr_coarse.counts[0,0,0,0] == np.sum(nnr_fine.counts[:5,0,0,0])
 
-
-def test_increment():
-    a = np.zeros((2,2), dtype=int)
-    res = NearestNeighborAnalysis.increment_using_multiindices(a, np.array([[0,0], [1,1]], dtype=int))
-    assert np.array_equal(res, np.array([[1,0], [0,1]], dtype=int))
