@@ -84,6 +84,13 @@ class CharmmTrajectoryIterator(object):
     def __len__(self):
         return self.last - self.first + 1
 
+    def __getitem__(self, index):
+        trajectory = self.load_function(self.filename_template.format(index),
+                                        top=self.topology,
+                                        atom_indices=self.selection)
+        trajectory.i = index
+        return trajectory
+
 
 def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
     """

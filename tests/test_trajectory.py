@@ -2,7 +2,7 @@
 
 from rflow import CharmmTrajectoryIterator, normalize
 from rflow.utility import abspath
-
+import numpy as np
 import pytest
 
 
@@ -18,6 +18,13 @@ def iterator():
 def test_iterator(iterator):
     for seq in iterator:
         assert seq.n_frames == 100
+
+
+def test_indexing(iterator):
+    traj2 = iterator[2]
+    for t in iterator:
+        pass
+    assert np.isclose(t.xyz, traj2.xyz).all()
 
 
 def test_normalize(iterator):
