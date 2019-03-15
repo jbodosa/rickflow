@@ -112,6 +112,14 @@ class PermeationEventCounter(object):
                 half a crossing already. Setting this to False can lead to dramatic underestimates of the permeability,
                 especially for lipid-soluble permeants.
         """
+        try:
+            assert len(solute_ids) > 0
+        except AssertionError:
+            raise RickFlowException("The list of solute_ids that you provided was empty.")
+        except:
+            raise RickFlowException("Invalid solute_ids. "
+                                    "Please provide atom indices as a non-empty list "
+                                    "(or numpy array) of integers.")
         self.center_threshold = center_threshold
         self.dividing_surface = dividing_surface
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from rflow import CharmmTrajectoryIterator, TransitionCounter, PermeationEventCounter, Distribution
+from rflow import CharmmTrajectoryIterator, TransitionCounter, PermeationEventCounter, Distribution, RickFlowException
 from rflow.utility import abspath
 
 import os
@@ -65,6 +65,16 @@ def test_critical_transitions():
     print(PermeationEventCounter.make_critical_transitions())
 
 
+def test_empty_list_error():
+    with pytest.raises(RickFlowException):
+        PermeationEventCounter([], 0.1, 0.05, membrane=None, initialize_all_permeants=True)
+
+
+def test_invalid_ids_error():
+    with pytest.raises(RickFlowException):
+        PermeationEventCounter(None, 0.1, 0.05, membrane=None, initialize_all_permeants=True)
+
+
 def test_distribution(iterator):
     dist = Distribution(atom_selection=[51], coordinate=2, nbins=10)
     for seq in iterator:
@@ -95,3 +105,4 @@ def test_permeability(iterator):
         dist(seq)
         pcount(seq)
     assert pcount.permeability(dist, mode="semi-permeation") > 0.0
+
