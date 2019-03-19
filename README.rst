@@ -40,7 +40,7 @@ Getting Started
 
 2) Create a conda environment with all the requirements::
 
-    $ conda create -n rflow -c omnia python=3.6 openmm mdtraj numpy pandas
+    $ conda create -n rflow -c omnia python=3.6 openmm mdtraj numpy pandas openmmtools
 
 3) Activate the environment (has to be done every time you open a new terminal)::
 
