@@ -22,7 +22,10 @@ workflow = RickFlow(
     box_dimensions=[50,50,53.1975],
     gpu_id=0,
     nonbonded_method=PME,
-    tmp_output_dir=os.path.join("/lscratch", os.environ['SLURM_JOB_ID'])
+    #tmp_output_dir=os.path.join("/lscratch", os.environ['SLURM_JOB_ID']),
+    dcd_output_interval=1000,
+    table_output_interval=10,
+    sequence_length=100*u.picosecond
 )
 
 
