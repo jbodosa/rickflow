@@ -116,6 +116,9 @@ class RickFlow(object):
                  switch_distance=1.0*u.nanometer,
                  work_dir=".",
                  tmp_output_dir=None,
+                 dcd_output_interval=1000,
+                 table_output_interval=1000,
+                 sequence_length=1.0*u.nanosecond,
                  misc_psf_create_system_kwargs={}
                  ):
         """
@@ -137,6 +140,9 @@ class RickFlow(object):
             switch_distance (simtk.unit): Switching distance for LJ potential.
             work_dir (str): The working directory.
             tmp_output_dir (str): A temporary directory for output during simulations.
+            dcd_output_interval (int): Number of time steps between trajectory frames.
+            table_output_interval (int):  Number of time steps between lines in output tables.
+            sequence_length (simtk.unit): length of a single sequence
             misc_psf_create_system_kwargs (dict): Provides an interface for the user to modify keyword
                 arguments of the CharmmPsfFile.createSystem() call.
         """
@@ -159,6 +165,9 @@ class RickFlow(object):
                     os.mkdir("res")
         else:
             self.tmp_output_dir = None
+        self.dcd_output_interval = dcd_output_interval
+        self.table_output_interval = table_output_interval
+        self.sequence_length = sequence_length
 
         with CWD(self.work_dir):
             self.parameters = CharmmParameterSet(*toppar)
@@ -299,16 +308,15 @@ class RickFlow(object):
         with CWD(output_dir):
             self.simulation.reporters.clear()
             self.simulation.reporters.append(
-                DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), 1000))
+                DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), self.dcd_output_interval))
             self.simulation.reporters.append(
-                StateDataReporter("out/out{}.txt".format(self.next_seqno), 1000,
+                StateDataReporter("out/out{}.txt".format(self.next_seqno), self.table_output_interval,
                                   step=True, time=True,
                                   potentialEnergy=True, temperature=True,
                                   volume=True, density=True, speed=True))
 
             # run one sequence
-            duration = 1. * u.nanosecond
-            n_steps = round(duration / (1. * u.femtosecond))
+            n_steps = round(self.sequence_length / (1. * u.femtosecond))
             print("Starting {} steps".format(n_steps))
 
             self.simulation.step(n_steps)
