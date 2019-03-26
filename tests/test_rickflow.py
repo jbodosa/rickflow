@@ -61,7 +61,7 @@ def run_and_restart(tmpdir_factory):
         dcd_output_interval=10,
         recenter_coordinates=False,
         work_dir=str(tmpdir),
-        use_only_xml_restarts=False
+        use_only_xml_restarts=True
     )
     rf.prepareSimulation(LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ))
     rf.run()
@@ -72,7 +72,8 @@ def test_run_and_restart(run_and_restart):
     assert os.path.isfile(os.path.join(run_and_restart.work_dir, "out", "out2.txt"))
     assert os.path.isfile(os.path.join(run_and_restart.work_dir, "trj", "dyn2.dcd"))
 
-@pytest.mark.skipif(True, reason="requires charmm to be installed")
+
+@pytest.mark.skipif(True, reason="requires a working CHARMM installation 'c41n1'")
 def test_charmm_postprocessing(run_and_restart):
     shutil.copytree(abspath("data/toppar"), os.path.join(run_and_restart.work_dir, "toppar"))
     shutil.copy(abspath("data/edges+area.inp"), run_and_restart.work_dir)

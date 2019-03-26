@@ -314,8 +314,8 @@ class RickFlow(object):
             last_out = np.loadtxt("out/out{}.txt".format(self.next_seqno - 1),
                                   delimiter=",")
             last_step = int(last_out[-1][0])
-            last_time = round(last_out[-1][1]) * u.picosecond
-            print("Restart at step {}. Time = {}.".format(last_step, last_time))
+            last_time = last_out[-1][1] * u.picosecond
+            print("Restart at step {}. Time = {}.".format(last_step, last_time.format("%.4f")))
             self.simulation.currentStep = last_step
             self.context.setTime(last_time)
         self.context.applyConstraints(1e-7)
