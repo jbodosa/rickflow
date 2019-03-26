@@ -24,7 +24,7 @@ workflow = RickFlow(
     nonbonded_method=PME,
     #tmp_output_dir=os.path.join("/lscratch", os.environ['SLURM_JOB_ID']),
     dcd_output_interval=1000,
-    table_output_interval=10,
+    table_output_interval=1000,
     steps_per_sequence=1000000
 )
 
