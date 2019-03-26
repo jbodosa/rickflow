@@ -65,9 +65,11 @@ def submit(batch):
     """
     Submit the workflow using a batch script.
     """
+    if not os.path.isdir("log"):  # directory for slurm output files
+        os.mkdir("log")
     assert os.path.isfile(batch)
     cwd = os.path.basename(os.getcwd())
-    os.system("sbatch -o {}-%j.log -J {} {}".format(cwd, cwd, batch))
+    os.system("sbatch -o log/{}-%j.log -J {} {}".format(cwd, cwd, batch))
 
 
 @main.command()

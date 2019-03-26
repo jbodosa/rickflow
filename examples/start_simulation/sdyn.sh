@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --time=1:00:00 --ntasks=1 --nodes=1 -p gpu -o log/slurm-%j.out
-#SBATCH --ntasks-per-node=1 --cpus-per-task=2 --gres=gpu:p100:1
+#SBATCH --time=1:00:00 --ntasks=1 --nodes=1 -p pascal
+#SBATCH --ntasks-per-node=1 --cpus-per-task=2 --gres=gpu:1
 
 # Note that we do not want to use the node exclusively,
 # especially when using nodes with multiple GPUs (on lobos: k40 -- 2 GPUs, pascal -- 4 GPUs).
