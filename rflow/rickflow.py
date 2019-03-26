@@ -330,11 +330,11 @@ class RickFlow(object):
             with open("trj/dyn{}.dcd".format(self.next_seqno), "wb") as dcd:
                 dcd_file = DCDFile(dcd, self.psf.topology, self.simulation.integrator.getStepSize(),
                                    self.simulation.currentStep + self.dcd_output_interval, self.dcd_output_interval)
-                # first frame in the trajectory is after the 1000th integration step (if the interval is 1000)
+                # first frame in the trajectory is after the 1000th integration step if the output interval is 1000.
+                # I am using this to make CHARMM happy. Dcd files written by the DCDReporter cause warnings in charmm,
+                # e.g. the first frame is 0 and cannot be read
 
                 self.simulation.reporters.clear()
-                #self.simulation.reporters.append(
-                #    DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), self.dcd_output_interval))
                 self.simulation.reporters.append(
                     StateDataReporter("out/out{}.txt".format(self.next_seqno), self.table_output_interval,
                                       step=True, time=True,
