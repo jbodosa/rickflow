@@ -48,6 +48,8 @@ def get_next_seqno_and_checkpoints(work_dir="."):
             os.mkdir("out")
         if not os.path.isdir("res"):  # directory for restart files
             os.mkdir("res")
+        if not os.path.isdir("log"):  # directory for slurm output files
+            os.mkdir("log")
 
         # a file containing the id of the next sequence to be simulated
         if not os.path.isfile("next.seqno"):
