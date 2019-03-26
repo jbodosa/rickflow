@@ -118,7 +118,8 @@ class RickFlow(object):
                  tmp_output_dir=None,
                  dcd_output_interval=1000,
                  table_output_interval=1000,
-                 sequence_length=1.0*u.nanosecond,
+                 steps_per_sequence=1000000,
+                 use_only_xml_restarts=False,
                  misc_psf_create_system_kwargs={}
                  ):
         """
@@ -142,9 +143,11 @@ class RickFlow(object):
             tmp_output_dir (str): A temporary directory for output during simulations.
             dcd_output_interval (int): Number of time steps between trajectory frames.
             table_output_interval (int):  Number of time steps between lines in output tables.
-            sequence_length (simtk.unit): length of a single sequence
+            steps_per_sequence (int): Number of time steps per job.
             misc_psf_create_system_kwargs (dict): Provides an interface for the user to modify keyword
                 arguments of the CharmmPsfFile.createSystem() call.
+            use_only_xml_restarts (bool): If True, always use state files for restarts.
+                If False, try checkpoint file first.
         """
 
         self.work_dir = work_dir
@@ -167,7 +170,8 @@ class RickFlow(object):
             self.tmp_output_dir = None
         self.dcd_output_interval = dcd_output_interval
         self.table_output_interval = table_output_interval
-        self.sequence_length = sequence_length
+        self.steps_per_sequence = steps_per_sequence
+        self.use_only_xml_restarts = use_only_xml_restarts
 
         with CWD(self.work_dir):
             self.parameters = CharmmParameterSet(*toppar)
@@ -197,7 +201,10 @@ class RickFlow(object):
             move = target_com - current_com
             self.crd.positions += move
         # save positions as list, so we can append virtual sites, if needed
-        self.positions = self.crd.positions.value_in_unit(u.angstrom).tolist()
+        try:
+            self.positions = self.crd.positions.value_in_unit(u.angstrom).tolist()
+        except:
+            self.positions = list(self.crd.positions.value_in_unit(u.angstrom))
         # manually remove long-range correction from the nonbonded force
         # (that will hopefully get fixed in CharmmPsfFile.createSystem
         # # at some point)
@@ -279,16 +286,22 @@ class RickFlow(object):
                 )
             )
         else:
-            try:
-                print("Attempting restart...")
-                self.simulation.loadCheckpoint(self.current_checkpoint)
-                print("Restarting from checkpoint file {}.".format(
-                    self.current_checkpoint))
-            except:
-                print("    ...could not read from checkpoint file...")
+            print("Attempting restart...")
+            if not self.use_only_xml_restarts:
+                try:
+                    self.simulation.loadCheckpoint(self.current_checkpoint)
+                    print("Restarting from checkpoint file {}.".format(
+                        self.current_checkpoint))
+                except:
+                    print("    ...could not read from checkpoint file...")
+                    self.simulation.loadState(self.current_state)
+                    print("Restarting from state file {}.".format(
+                        self.current_state))
+            else:
                 self.simulation.loadState(self.current_state)
                 print("Restarting from state file {}.".format(
                     self.current_state))
+
             # read time and timestep
             last_out = np.loadtxt("out/out{}.txt".format(self.next_seqno - 1),
                                   delimiter=",")
@@ -316,10 +329,9 @@ class RickFlow(object):
                                   volume=True, density=True, speed=True))
 
             # run one sequence
-            n_steps = round(self.sequence_length / (1. * u.femtosecond))
-            print("Starting {} steps".format(n_steps))
+            print("Starting {} steps".format(self.steps_per_sequence))
 
-            self.simulation.step(n_steps)
+            self.simulation.step(self.steps_per_sequence)
 
             # save checkpoints
             self.simulation.saveState("res/state{}.xml".format(self.next_seqno))
