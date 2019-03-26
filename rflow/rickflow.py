@@ -15,7 +15,7 @@ from simtk.openmm import CustomNonbondedForce, NonbondedForce
 from simtk.openmm.app import Simulation
 from simtk.openmm.app import CharmmPsfFile, CharmmParameterSet, CharmmCrdFile
 from simtk.openmm.app import LJPME, PME, HBonds
-from simtk.openmm.app import DCDReporter, StateDataReporter, PDBReporter
+from simtk.openmm.app import DCDFile, StateDataReporter, PDBReporter
 
 import mdtraj as md
 
@@ -172,6 +172,14 @@ class RickFlow(object):
         self.table_output_interval = table_output_interval
         self.steps_per_sequence = steps_per_sequence
         self.use_only_xml_restarts = use_only_xml_restarts
+        if not steps_per_sequence % dcd_output_interval== 0:
+            raise RickFlowException("dcd_output_interval ({}) has to be a divisor of steps_per_sequence ({}).".format(
+                dcd_output_interval, steps_per_sequence
+            ))
+        if not steps_per_sequence % table_output_interval== 0:
+            raise RickFlowException("table_output_interval ({}) has to be a divisor of steps_per_sequence ({}).".format(
+                table_output_interval, steps_per_sequence
+            ))
 
         with CWD(self.work_dir):
             self.parameters = CharmmParameterSet(*toppar)
@@ -319,19 +327,28 @@ class RickFlow(object):
         # define output for the current run
         output_dir = self.work_dir if self.tmp_output_dir is None else self.tmp_output_dir
         with CWD(output_dir):
-            self.simulation.reporters.clear()
-            self.simulation.reporters.append(
-                DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), self.dcd_output_interval))
-            self.simulation.reporters.append(
-                StateDataReporter("out/out{}.txt".format(self.next_seqno), self.table_output_interval,
-                                  step=True, time=True,
-                                  potentialEnergy=True, temperature=True,
-                                  volume=True, density=True, speed=True))
+            with open("trj/dyn{}.dcd".format(self.next_seqno), "wb") as dcd:
+                dcd_file = DCDFile(dcd, self.psf.topology, self.simulation.integrator.getStepSize(),
+                                   self.simulation.currentStep + self.dcd_output_interval, self.dcd_output_interval)
+                # first frame in the trajectory is after the 1000th integration step (if the interval is 1000)
 
-            # run one sequence
-            print("Starting {} steps".format(self.steps_per_sequence))
+                self.simulation.reporters.clear()
+                #self.simulation.reporters.append(
+                #    DCDReporter("trj/dyn{}.dcd".format(self.next_seqno), self.dcd_output_interval))
+                self.simulation.reporters.append(
+                    StateDataReporter("out/out{}.txt".format(self.next_seqno), self.table_output_interval,
+                                      step=True, time=True,
+                                      potentialEnergy=True, temperature=True,
+                                      volume=True, density=True, speed=True))
 
-            self.simulation.step(self.steps_per_sequence)
+                # run one sequence
+                print("Starting {} steps".format(self.steps_per_sequence))
+
+                for i in range(self.steps_per_sequence // self.dcd_output_interval):
+                    self.simulation.step(self.dcd_output_interval)
+                    # write to dcd
+                    state = self.context.getState(getPositions=True, enforcePeriodicBox=True)
+                    dcd_file.writeModel(state.getPositions(), periodicBoxVectors=state.getPeriodicBoxVectors())
 
             # save checkpoints
             self.simulation.saveState("res/state{}.xml".format(self.next_seqno))

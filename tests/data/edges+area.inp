@@ -1,0 +1,54 @@
+* get cell a,c and compute area/lipid
+*
+
+set FF = 1
+set LF = 2
+
+read rtf card name toppar/top_all36_lipid.rtf
+read param flex card name toppar/par_all36_lipid.prm
+stream toppar/toppar_water_ions.str
+
+read sequ TIP3 526
+gener WAT setup warn noang nodihe first none last none
+read coor card name water.crd
+
+coor copy comp
+
+write psf card name water2.psf
+
+set A = 25.1984
+crystal define cubic @A @A @A 90. 90. 90.
+crystal build cutoff 14.0 noper 0
+image byres
+set FX = 24 ! for PME
+
+calc nf = 1 + ( @LF - @FF )
+calc mxt = 10 * @NF
+
+correl maxs 4 maxt @MXT maxa ?NATOM noupdate
+enter ua cell a
+enter uc cell c
+enter ar zero
+
+set k = @FF
+set u = 101
+label trjopn
+  open unit @U file read name trj/dyn@K.dcd
+  incr u by 1
+  incr k by 1
+if k le @LF goto trjopn
+
+traj firstu 101 nunit @NF begin 10 skip 10
+
+mantim ar copy ua
+mantim ar squa
+
+open unit 2 write card name ucar.txt
+edit ua veccod 3 skip 1 delta 100. offset 100.
+write ua dumb time unit 2
+* invisible
+*
+
+end
+stop
+
