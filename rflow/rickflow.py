@@ -21,6 +21,7 @@ import mdtraj as md
 
 from rflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
 from rflow.utility import CWD
+from rflow import omm_vfswitch
 
 
 def get_next_seqno_and_checkpoints(work_dir="."):
@@ -120,7 +121,8 @@ class RickFlow(object):
                  table_output_interval=1000,
                  steps_per_sequence=1000000,
                  use_only_xml_restarts=False,
-                 misc_psf_create_system_kwargs={}
+                 misc_psf_create_system_kwargs={},
+                 use_vfswitch=True,
                  ):
         """
         The constructor sets up the system.
@@ -199,6 +201,10 @@ class RickFlow(object):
             self.parameters,
             **psf_create_system_kwargs
         )
+        # Van-der-Waals force switch
+        if use_vfswitch:
+            self._system = omm_vfswitch.vfswitch(self._system, self.psf)
+
         # translate system so that the center of mass of non-waters is in the middle
         if recenter_coordinates:
             non_waters = [i for i in range(self.crd.natom)
