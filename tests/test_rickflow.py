@@ -87,6 +87,10 @@ def test_charmm_postprocessing(run_and_restart):
                 assert rc == 0
 
 
+def test_select(rickflow_instance):
+    assert len(rickflow_instance.select("resname DLPC")) > 0
+
+
 def test_directory_structure(rickflow_instance):
     assert os.path.exists(os.path.join(rickflow_instance.work_dir, "out"))
     assert os.path.exists(os.path.join(rickflow_instance.work_dir, "trj"))

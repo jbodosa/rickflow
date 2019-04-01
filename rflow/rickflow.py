@@ -230,11 +230,17 @@ class RickFlow(object):
         # set up misc fields
         self.context = None
         self.simulation = None
+        self._omm_topology = None
 
     @property
     def system(self):
         return self._system
 
+    def select(self, *args, **kwargs):
+        if self._omm_topology is None:
+            self._omm_topology = md.Topology.from_openmm(self.psf.topology)
+        return self._omm_topology.select(*args, **kwargs
+                                         )
     def centerOfMass(self, particle_ids):
         """
         Calculate the center of mass of a subset of atoms.
