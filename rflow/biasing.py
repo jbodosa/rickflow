@@ -41,8 +41,8 @@ def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
         collective_variable = CustomExternalForce("m/M * z")
     collective_variable.addGlobalParameter("M", total_mass)
     collective_variable.addPerParticleParameter("m")
-    for i in range(len(particle_ids)):
-        collective_variable.addParticle(particle_ids[i], np.array([masses[i]]))
+    for i,particle_id in enumerate(particle_ids):
+        collective_variable.addParticle(particle_id, np.array([masses[i]]))
     return collective_variable
 
 
@@ -260,7 +260,10 @@ class RelativePartialCenterOfMassRestraint(object):
             box_height_guess (simtk.unit.Quantity object): A length that provides a guess
                 for the box height. Must not deviate from any instantaneous box height by more than 25%.
         """
-        self.atom_ids = atom_ids
+        try:
+            self.atom_ids = atom_ids.tolist()
+        except AttributeError:
+            self.atom_ids = atom_ids
         self.force_constant = force_constant
         self.position = position
         self.energy_string = "k0 * (zcom - zref)^2"
@@ -275,7 +278,7 @@ class RelativePartialCenterOfMassRestraint(object):
             An OpenMM force object.
         """
         biasing_force = CustomCVForce(self.energy_string)
-        masses = [system.getParticleMass(int(atom)) for atom in self.atom_ids]
+        masses = [system.getParticleMass(atom) for atom in self.atom_ids]
         com_cv = make_center_of_mass_z_cv(self.atom_ids, masses, relative=True, box_height=self.box_height)
         biasing_force.addCollectiveVariable("zcom", com_cv)
         biasing_force.addGlobalParameter("zref", self.position)
