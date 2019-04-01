@@ -122,7 +122,6 @@ class RickFlow(object):
                  steps_per_sequence=1000000,
                  use_only_xml_restarts=False,
                  misc_psf_create_system_kwargs={},
-                 use_vfswitch=True,
                  ):
         """
         The constructor sets up the system.
@@ -201,9 +200,6 @@ class RickFlow(object):
             self.parameters,
             **psf_create_system_kwargs
         )
-        # Van-der-Waals force switch
-        if use_vfswitch:
-            self._system = omm_vfswitch.vfswitch(self._system, self.psf)
 
         # translate system so that the center of mass of non-waters is in the middle
         if recenter_coordinates:
@@ -331,6 +327,11 @@ class RickFlow(object):
             self.simulation.currentStep = last_step
             self.context.setTime(last_time)
         self.context.applyConstraints(1e-7)
+
+    def use_vdw_force_switch(self):
+        """Use van der Waals force switch.
+        Should be called after every custom nonbonded force has been added to the system."""
+        self._system = omm_vfswitch.vfswitch(self._system, self.psf)
 
     def run(self):
         """
