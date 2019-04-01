@@ -271,11 +271,11 @@ class RelativePartialCenterOfMassRestraint(object):
         Args:
             system: The OpenMM system.
 
-        Returns:
+        Returns::x
             An OpenMM force object.
         """
         biasing_force = CustomCVForce(self.energy_string)
-        masses = [system.getParticleMass(atom) for atom in self.atom_ids]
+        masses = [system.getParticleMass(int(atom)) for atom in self.atom_ids]
         com_cv = make_center_of_mass_z_cv(self.atom_ids, masses, relative=True, box_height=self.box_height)
         biasing_force.addCollectiveVariable("zcom", com_cv)
         biasing_force.addGlobalParameter("zref", self.position)
