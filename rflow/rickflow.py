@@ -8,6 +8,7 @@ import os
 import glob
 import numpy as np
 import shutil
+import random
 
 import simtk.unit as u
 from simtk.openmm import Platform
@@ -126,6 +127,7 @@ class RickFlow(object):
                  steps_per_sequence=1000000,
                  use_only_xml_restarts=False,
                  misc_psf_create_system_kwargs={},
+                 initialize_velocities=True
                  ):
         """
         The constructor sets up the system.
@@ -234,6 +236,7 @@ class RickFlow(object):
         self.context = None
         self.simulation = None
         self._omm_topology = None
+        self.initialize_velocities = initialize_velocities
 
     @property
     def system(self):
@@ -310,6 +313,10 @@ class RickFlow(object):
                     unit=u.angstrom
                 )
             )
+            if self.initialize_velocities:
+                temperature = self.simulation.integrator.getTemperature()
+                print("Setting random initial velocities with temperature {}".format(temperature))
+                self.context.setVelocitiesToTemperature(temperature)
         else:
             print("Attempting restart...")
             if not self.use_only_xml_restarts:
