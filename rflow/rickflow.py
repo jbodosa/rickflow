@@ -114,7 +114,9 @@ class RickFlow(object):
                  box_dimensions, gpu_id=0,
                  nonbonded_method=PME,
                  recenter_coordinates=True,
-                 switch_distance=1.0*u.nanometer,
+                 switch_distance=8*u.angstrom,
+                 cutoff_distance=12*u.angstrom,
+                 use_vdw_force_switch=True,
                  work_dir=".",
                  tmp_output_dir=None,
                  dcd_output_interval=1000,
@@ -189,9 +191,12 @@ class RickFlow(object):
             self.psf.setBox(*box_dimensions)
             self.crd = CharmmCrdFile(crd)
         # create system
+        self._cutoff_distance = cutoff_distance
+        self._switch_distance = switch_distance
+        self.use_vdw_force_switch = use_vdw_force_switch
         psf_create_system_kwargs = {
             "nonbondedMethod": nonbonded_method,
-            "nonbondedCutoff": 1.2 * u.nanometer,
+            "nonbondedCutoff": cutoff_distance,
             "constraints": HBonds,
             "switchDistance": switch_distance
         }
@@ -235,8 +240,8 @@ class RickFlow(object):
     def select(self, *args, **kwargs):
         if self._omm_topology is None:
             self._omm_topology = md.Topology.from_openmm(self.psf.topology)
-        return self._omm_topology.select(*args, **kwargs
-                                         )
+        return self._omm_topology.select(*args, **kwargs)
+
     def centerOfMass(self, particle_ids):
         """
         Calculate the center of mass of a subset of atoms.
@@ -265,6 +270,8 @@ class RickFlow(object):
             integrator (OpenMM integrator object): The integrator to be used.
             barostat (OpenMM barostat object): The barostat. Pass None for NVT.
         """
+        if self.use_vdw_force_switch:
+            self.apply_vdw_force_switch(switch_distance=self._switch_distance, cutoff_distance=self._cutoff_distance)
         if self.gpu_id is not None:
             platform, platform_properties = require_cuda(self.gpu_id)
         else:
@@ -328,10 +335,10 @@ class RickFlow(object):
             self.context.setTime(last_time)
         self.context.applyConstraints(1e-7)
 
-    def use_vdw_force_switch(self):
+    def apply_vdw_force_switch(self, switch_distance, cutoff_distance):
         """Use van der Waals force switch.
         Should be called after every custom nonbonded force has been added to the system."""
-        self._system = omm_vfswitch.vfswitch(self._system, self.psf)
+        self._system = omm_vfswitch.vfswitch(self._system, self.psf, switch_distance, cutoff_distance)
 
     def run(self):
         """

@@ -91,10 +91,6 @@ def test_select(rickflow_instance):
     assert len(rickflow_instance.select("resname DLPC")) > 0
 
 
-def test_vfswitch(rickflow_instance):
-    rickflow_instance.use_vdw_force_switch()
-
-
 def test_directory_structure(rickflow_instance):
     assert os.path.exists(os.path.join(rickflow_instance.work_dir, "out"))
     assert os.path.exists(os.path.join(rickflow_instance.work_dir, "trj"))
