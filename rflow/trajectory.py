@@ -113,14 +113,7 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
         np.array: The normalized coordinates.
 
     """
-    if com_selection is None:
-        membrane_center = np.array([0.0])
-    else:
-        membrane = selection(trajectory, com_selection)
-        membrane_trajectory = trajectory.atom_slice(membrane)
-        membrane_center = md.compute_center_of_mass(
-            membrane_trajectory
-        )[:, coordinates]
+    membrane_center = center_of_mass_of_selection(trajectory, com_selection, coordinates)
 
     selected = selection(trajectory, subselect)
     # normalize z coordinates: scale to [0,1] and shift membrane center to 0.5
@@ -135,3 +128,31 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
     z_normalized = np.mod(z_normalized, 1.0).transpose()
 
     return z_normalized
+
+
+def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1,2]):
+    """
+    Compute the center of mass of a selection of atoms.
+    Args:
+        trajectory:    An mdtraj trajectory.
+        com_selection: Either a DSL selection string or a list (np.array) of atom ids.
+        coordinates (int in [0,1,2], or sublist of [0,1,2]): The coordinates for which to calculate the center of mass.
+
+    Returns:
+
+    """
+    if com_selection is None:
+        if isinstance(coordinates, int):
+            return np.array(0.0)
+        else:
+            return np.array([0.0]*len(coordinates))
+    selected_atom_ids = selection(trajectory, com_selection)
+
+    for i, a in enumerate(trajectory.topology.atoms):
+        assert i == a.index
+    masses = np.array([atom.element.mass for atom in trajectory.topology.atoms])
+    center_of_mass = np.einsum(
+        "i,ni...->n...", masses[selected_atom_ids], trajectory.xyz[:, selected_atom_ids])
+    center_of_mass /= np.sum(masses[selected_atom_ids])
+    return center_of_mass[:,coordinates]
+
