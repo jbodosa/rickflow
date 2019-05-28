@@ -235,11 +235,17 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
                                  coordinates=2, subselect=self.permeants)
         z_digitized = np.digitize(z_normalized, self.bins)
         for i in range(traj.n_frames):
-            # compute interatomic distances between permeant and chain atoms
             distances_i = self.compute_distances(traj, i)
             self.process_one_frame(z_digitized[i], distances_i)
 
     def compute_distances(self, traj, i):
+        """Compute distances between permeant and chain atoms for one frame of a trajectory.
+        The point of this function is to avoid memory overflows.
+
+        Args:
+            traj (mdtraj trajectory): the trajectory
+            i (int): frame id
+        """
         if not hasattr(self, "dummy_frame") or self.dummy_frame is None:
             self.dummy_frame = traj.slice([i])
         else:
