@@ -228,25 +228,24 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
                                      self.n_frames, self.counts)
 
     def __call__(self, traj):
-        for i in range(traj.n_frames):
-            frame = traj.slice([i])
-            self.call_on_frame(frame)
-
-    def call_on_frame(self, frame):
-        """Process the nearest neighbor analysis for one frame.
-
-        Args:
-            frame: An mdtraj trajectory containing one frame.
-        """
-        # update bin centers and bin edges
-        assert frame.n_frames == 1
-        super(NearestNeighborAnalysis, self).__call__(frame)
+        # update bin centers and edges
+        super(NearestNeighborAnalysis, self).__call__(traj)
         # normalize z axis and categorize z coordinates into bins
-        z_normalized = normalize(frame, com_selection=self.com_selection,
+        z_normalized = normalize(traj, com_selection=self.com_selection,
                                  coordinates=2, subselect=self.permeants)
         z_digitized = np.digitize(z_normalized, self.bins)
         # compute interatomic distances between permeant and chain atoms
-        distances = md.compute_distances(frame, self.permeant_chain_pairs, periodic=True, opt=True)
+        distances = md.compute_distances(traj, self.permeant_chain_pairs, periodic=True, opt=True)
+        for i in range(traj.n_frames):
+            self.process_one_frame(z_digitized[i], distances[i])
+
+    def process_one_frame(self, z_digitized, distances):
+        """Process the nearest neighbor analysis for one frame.
+
+        Args:
+            z_digitized: Digitized z values for one frame.
+            distances: Distances between permeant and chain atoms for one frame.
+        """
         # refold so that distances can be accessed using [permeant_id, chain_atom_id], where
         # permeant_id enumerates the permeant atoms starting at 0, 1, ...
         # and chain_atom_id enumerates all chain atoms starting at 0, 1, ...
