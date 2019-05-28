@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from rflow import CharmmTrajectoryIterator, normalize
+from rflow import CharmmTrajectoryIterator, normalize, center_of_mass_of_selection
 from rflow.utility import abspath
 import numpy as np
 import pytest
-
+import mdtraj as md
 
 @pytest.fixture(scope="module")
 def iterator():
@@ -36,6 +36,18 @@ def test_normalize(iterator):
 
 def test_normalize_com(iterator):
     for seq in iterator:
-        normalized = normalize(seq, [0, 1, 2], "not water", [52])
+        normalized = normalize(seq, [0, 1, 2], "not water", [25])
         assert normalized.max() <= 1.0
         assert normalized.min() >= 0.0
+
+
+def test_compute_center_of_mass_selection(iterator):
+    selected = iterator.topology.select("not water")
+    for seq in iterator:
+        for coordinates in [2, [0,1,2], [0,1]]:
+            slice = seq.atom_slice(selected)
+            reference_com = md.compute_center_of_mass(
+                slice
+            )[:, coordinates]
+            com = center_of_mass_of_selection(seq, selected, coordinates)
+            assert com == pytest.approx(reference_com, 1e-4)
