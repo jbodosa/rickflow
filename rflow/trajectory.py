@@ -147,10 +147,8 @@ def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1
     for i, a in enumerate(trajectory.topology.atoms):
         assert i == a.index
     masses = np.array([atom.element.mass for atom in trajectory.topology.atoms])
-    center_of_mass = np.einsum("i,ni...->n...",
-                                masses[selected_atom_ids],
-                                trajectory.xyz[:, selected_atom_ids]
-                               )
+    center_of_mass = np.einsum(
+        "i,ni...->n...", masses[selected_atom_ids], trajectory.xyz[:, selected_atom_ids])
     center_of_mass /= np.sum(masses[selected_atom_ids])
     return center_of_mass[:,coordinates]
 

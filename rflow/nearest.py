@@ -239,6 +239,7 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
             frame: An mdtraj trajectory containing one frame.
         """
         # update bin centers and bin edges
+        assert frame.n_frames == 1
         super(NearestNeighborAnalysis, self).__call__(frame)
         # normalize z axis and categorize z coordinates into bins
         z_normalized = normalize(frame, com_selection=self.com_selection,
