@@ -7,7 +7,7 @@ import sys
 import click
 
 import rflow
-from rflow import CharmmTrajectoryIterator, Distribution, TransitionCounter
+from rflow import CharmmTrajectoryIterator, Distribution, TransitionCounter, make_topology
 import mdtraj as md
 import numpy as np
 
@@ -71,6 +71,23 @@ def submit(batch):
     cwd = os.path.basename(os.getcwd())
     os.system("sbatch -o log/{}-%j.log -J {} {}".format(cwd, cwd, batch))
 
+
+@main.command()
+@click.argument("selection", type=str)
+@click.option("-t", "topology_file", default="system.pdb",
+              type=click.Path(exists=True), help="Topology file (pdb or psf).")
+def select(selection, topology_file):
+    """
+    Check the atom ids of a selection string SELECTION
+    """
+    topology = make_topology(topology_file)
+    atom_ids = topology.select(selection)
+    print("Selection contains {} atoms.\n ids={}".format(len(atom_ids),atom_ids))
+
+
+@main.command()
+def count_crossings():
+    pass
 
 @main.command()
 @click.option("-p", "--permeant", type=str, help="Permeant selection string")

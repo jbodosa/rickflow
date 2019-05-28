@@ -17,6 +17,19 @@ from rflow.exceptions import RickFlowException, TrajectoryNotFound
 from rflow.utility import selection
 
 
+def make_topology(topology_file):
+    top_suffix = os.path.basename(topology_file).split(".")[-1]
+    if top_suffix == "pdb":
+        return md.load(topology_file).topology
+    elif top_suffix == "psf":
+        return md.Topology.from_openmm(
+            CharmmPsfFile(topology_file).topology
+        )
+    else:
+        raise RickFlowException(
+            "Error: topology_file has to be a pdb or psf file.")
+
+
 class CharmmTrajectoryIterator(object):
     """An iterator that runs over trajectory files.
 
@@ -54,16 +67,7 @@ class CharmmTrajectoryIterator(object):
         self.filename_template = filename_template
 
         # create topology
-        top_suffix = os.path.basename(topology_file).split(".")[-1]
-        if top_suffix == "pdb":
-            self.topology = md.load(topology_file).topology
-        elif top_suffix == "psf":
-            self.topology = md.Topology.from_openmm(
-                CharmmPsfFile(topology_file).topology
-            )
-        else:
-            raise RickFlowException(
-                "Error: topology_file has to be a pdb or psf file.")
+        self.topology = make_topology(topology_file)
 
         # create selection
         if isinstance(selection, str):
