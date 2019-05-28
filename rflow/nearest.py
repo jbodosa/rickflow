@@ -234,10 +234,23 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
         z_normalized = normalize(traj, com_selection=self.com_selection,
                                  coordinates=2, subselect=self.permeants)
         z_digitized = np.digitize(z_normalized, self.bins)
-        # compute interatomic distances between permeant and chain atoms
-        distances = md.compute_distances(traj, self.permeant_chain_pairs, periodic=True, opt=True)
         for i in range(traj.n_frames):
-            self.process_one_frame(z_digitized[i], distances[i])
+            # compute interatomic distances between permeant and chain atoms
+            distances_i = self.compute_distances(traj, i)
+            self.process_one_frame(z_digitized[i], distances_i)
+
+    def compute_distances(self, traj, i):
+        if not hasattr(self, "dummy_frame") or self.dummy_frame is None:
+            self.dummy_frame = traj.slice([i])
+        else:
+            self.dummy_frame.xyz[0] = traj.xyz[i]
+            self.dummy_frame.time[0] = traj.time[i]
+            self.dummy_frame.unitcell_lengths[0] = traj.unitcell_lengths[i]
+            self.dummy_frame.unitcell_volumes[0] = traj.unitcell_volumes[i]
+            self.dummy_frame.unitcell_angles[0] = traj.unitcell_angles[i]
+            self.dummy_frame.unitcell_vectors[0] = traj.unitcell_vectors[i]
+        return md.compute_distances(self.dummy_frame, self.permeant_chain_pairs, periodic=True, opt=True)
+
 
     def process_one_frame(self, z_digitized, distances):
         """Process the nearest neighbor analysis for one frame.
