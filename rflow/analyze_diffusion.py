@@ -40,7 +40,7 @@ class TransitionCounter(object):
         self.num_bins = num_bins
         self.solute = solute
         self.membrane = membrane
-        self.n_timesteps = 0
+        self.n_frames = 0
         self.average_box_height = 0.0
 
     @property
@@ -58,10 +58,10 @@ class TransitionCounter(object):
         z_normalized = normalize(trajectory, 2, self.membrane, self.solute)
 
         # update edges
-        self.average_box_height = (self.average_box_height * self.n_timesteps
+        self.average_box_height = (self.average_box_height * self.n_frames
                                    + np.mean(trajectory.unitcell_lengths[:, 2]) * trajectory.n_frames)
-        self.n_timesteps += trajectory.n_frames
-        self.average_box_height /= self.n_timesteps
+        self.n_frames += trajectory.n_frames
+        self.average_box_height /= self.n_frames
 
         # find bin indices
         h = 1.0 / self.num_bins
@@ -79,16 +79,24 @@ class TransitionCounter(object):
                         self.matrices[lag],
                         np.column_stack([self.fifo_positions[0],self.fifo_positions[lag]]))
 
-    def save_matrices(self, filename_template):
+    def save_matrices(self, filename_template, time_between_frames=1.0, dt=1.0):
+        """
+        Writes transitions matrices in a format that can be read by diffusioncma and mcdiff.
+        Args: 
+            filename_template (str): template for the files, where {} is a placeholder for the lag time.
+            time_between_frames (float): time elapsed between two trajectory frames in picoseconds.
+            dt (float): the time step dt written into the header of the files.
+        """
         try:
             from dcma.matrices import Transitions
         except ImportError:
             raise RickFlowException("Saving transition matrices requires the dcma package to be installed.")
-        for l in self.matrices:
-            filename = filename_template.format(l)
+        for lag in self.matrices:
+            filename = filename_template.format(lag)
             #                              dcma expects edges in angstrom: multiply by 10
-            tmat = Transitions(lag_time=l, edges=self.edges_around_zero*10.0, matrix=self.matrices[l])
-            tmat.save(filename)
+            tmat = Transitions(lag_time=lag*time_between_frames, edges=self.edges_around_zero*10.0, 
+                               matrix=self.matrices[lag])
+            tmat.save(filename, dt=dt)
 
 
 class PermeationEventCounter(object):
