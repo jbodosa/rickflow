@@ -160,8 +160,8 @@ def test_constant_pull_periodic():
     integrator = VerletIntegrator(1.0 * u.femtosecond)
     context = Context(system, integrator)
     context.setPeriodicBoxVectors(*np.eye(3) * 1.0 * u.nanometer)
-    context.setPositions([[0.0,0.0,0.0]])
-    context.setVelocities([[0.0,0.0,0.0]])
+    context.setPositions([[0.0, 0.0, 0.0]])
+    context.setVelocities([[0.0, 0.0, 0.0]])
     for i in range(1000):
         integrator.step(1)
         state = context.getState(getPositions=True)
