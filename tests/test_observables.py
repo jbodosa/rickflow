@@ -54,6 +54,8 @@ def test_time_series_radd():
 def double(a):
     return np.array([2*a])
 
+def something(a,b,c=0):
+    return np.array([a*b+c])
 
 def test_evaluator():
     q = TimeSeries(evaluator=double)
@@ -63,6 +65,21 @@ def test_evaluator():
     assert q.data[0] == 2
     assert q.data[1] == 4
     assert q.data[2] == 6
+
+def test_evaluator_with_args():
+    q = TimeSeries(evaluator=something)
+    q(1,3)
+    q(2,3)
+    q(3,3)
+    assert q.data[0] == 3
+    assert q.data[1] == 6
+    assert q.data[2] == 9
+    q(1,3,c=1)
+    q(2,3,c=1)
+    q(3,3,c=1)
+    assert q.data[3] == 4
+    assert q.data[4] == 7
+    assert q.data[5] == 10
 
 
 def test_evaluator_with_file(tmpdir):
