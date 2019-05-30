@@ -12,7 +12,7 @@ class TimeSeries(object):
     def __init__(self, evaluator=None, name="", filename=None, append=False):
         """
         Args:
-            evaluator (callable): The callable takes an mdtraj trajectory as its only argument and returns a numpy array.
+            evaluator (callable): The callable returns a numpy array.
             filename:
             append:
         """
@@ -46,8 +46,8 @@ class TimeSeries(object):
         self.update_file()
         return self
 
-    def __call__(self, traj):
-        self += list(self.evaluator(traj))
+    def __call__(self, *args, **kwargs):
+        self += list(self.evaluator(*args, **kwargs))
 
     def append(self, value):
         self._data.append(value)
