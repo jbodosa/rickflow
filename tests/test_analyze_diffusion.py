@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from rflow import CharmmTrajectoryIterator, TransitionCounter, PermeationEventCounter, Distribution, RickFlowException
+from rflow import TrajectoryIterator, TransitionCounter, PermeationEventCounter, Distribution, RickFlowException
 from rflow.utility import abspath
 
 import os
@@ -11,7 +11,7 @@ import numpy as np
 
 @pytest.fixture(scope="module")
 def iterator():
-    return CharmmTrajectoryIterator(
+    return TrajectoryIterator(
         filename_template=abspath("data/whex{}.dcd"),
         first_sequence=1, last_sequence=2,
         topology_file=abspath("data/whex.pdb")
@@ -105,4 +105,15 @@ def test_permeability(iterator):
         dist(seq)
         pcount(seq)
     assert pcount.permeability(dist, mode="semi-permeation") > 0.0
+
+
+def test_permeation_warnings(iterator):
+    water = iterator.topology.select("water")
+    pcount = PermeationEventCounter(water, 0.06, 0.05, membrane="water", initialize_all_permeants=True)
+    for traj in iterator:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pcount(traj)
+    assert pcount.num_severe_warnings > 0
+    assert pcount.num_mild_warnings > 0
 

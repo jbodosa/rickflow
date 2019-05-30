@@ -7,6 +7,7 @@ import numpy as np
 from rflow.analyze_diffusion import normalize
 import mdtraj as md
 
+
 class TimeSeries(object):
     """A time series."""
     def __init__(self, evaluator=None, name="", filename=None, append=False):

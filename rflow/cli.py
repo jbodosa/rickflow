@@ -7,7 +7,7 @@ import sys
 import click
 
 import rflow
-from rflow import CharmmTrajectoryIterator, Distribution, TransitionCounter
+from rflow import TrajectoryIterator, Distribution, TransitionCounter, make_topology, center_of_mass_of_selection
 import mdtraj as md
 import numpy as np
 
@@ -73,6 +73,23 @@ def submit(batch):
 
 
 @main.command()
+@click.argument("selection", type=str)
+@click.option("-t", "--topology", default="system.pdb",
+              type=click.Path(exists=True), help="Topology file (pdb or psf).")
+def select(selection, topology):
+    """
+    Check the atom ids of a selection string SELECTION
+    """
+    top = make_topology(topology)
+    atom_ids = top.select(selection)
+    print("Selection contains {} atoms.\n ids={}".format(len(atom_ids), atom_ids))
+
+
+@main.command()
+def count_crossings():
+    pass
+
+@main.command()
 @click.option("-p", "--permeant", type=str, help="Permeant selection string")
 @click.option("-f", "--first_seq", type=int, help="First sequence of trajectory", default=1)
 @click.option("-m", "--membrane", type=str, help="Membrane selection string for com removal", default=None)
@@ -95,7 +112,7 @@ def tmat(permeant, first_seq, membrane=None,
     if not os.path.isdir(outdir):
         os.mkdir(outdir)
 
-    ti = CharmmTrajectoryIterator(
+    ti = TrajectoryIterator(
         first_sequence=first_seq, last_sequence=first_seq + length - 1)
 
     distribution = Distribution(atom_selection=permeant, coordinate=2)
@@ -111,7 +128,7 @@ def tmat(permeant, first_seq, membrane=None,
         distribution_with_com(traj)
         counter(traj)
         if membrane is not None:
-            com.append(md.compute_center_of_mass(traj.atom_slice(membrane)))
+            com.append(center_of_mass_of_selection(traj,membrane,2))
 
     # save transition matrices
     counter.save_matrices(os.path.join(

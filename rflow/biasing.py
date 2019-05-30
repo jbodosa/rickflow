@@ -11,7 +11,7 @@ import simtk.unit as u
 from simtk.openmm.openmm import CustomExternalForce, CustomCVForce
 from simtk.openmm.openmm import System, TwoParticleAverageSite, NonbondedForce
 from simtk.openmm.app import Element
-from rflow.utility import selection
+from rflow.utility import select_atoms
 
 
 def make_center_of_mass_z_cv(particle_ids, masses, relative=True,

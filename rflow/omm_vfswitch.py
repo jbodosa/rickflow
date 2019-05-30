@@ -9,13 +9,13 @@ Correspondance: jul316@lehigh.edu or wonpil@lehigh.edu
 Last update: March 29, 2017
 """
 
-from simtk.unit import *
 from simtk.openmm import *
-from simtk.openmm.app import *
+import simtk.unit as u
 
-def vfswitch(system, psf):
-    r_on = 1.0
-    r_off = 1.2
+
+def vfswitch(system, psf, switch_distance, cutoff_distance):
+    r_on = switch_distance.value_in_unit(u.nanometer)
+    r_off = cutoff_distance.value_in_unit(u.nanometer)
 
     # custom nonbonded force for force-switch
     chknbfix = False
