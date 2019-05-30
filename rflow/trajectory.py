@@ -6,6 +6,7 @@ Iterate over dcd trajectories.
 
 import os
 import glob
+import warnings
 
 import numpy as np
 
@@ -14,7 +15,7 @@ from simtk.openmm.app import CharmmPsfFile
 import mdtraj as md
 
 from rflow.exceptions import RickFlowException, TrajectoryNotFound
-from rflow.utility import selection
+from rflow.utility import select_atoms
 
 
 def make_topology(topology_file):
@@ -30,24 +31,52 @@ def make_topology(topology_file):
             "Error: topology_file has to be a pdb or psf file.")
 
 
-class CharmmTrajectoryIterator(object):
+class TrajectoryIterator(object):
     """An iterator that runs over trajectory files.
+
+    Args:
+        first_sequence (int or None): ID of the first sequence; default=None.
+                                      If None, take the first existing sequence ID matching the filename_template.
+        last_sequence (int or None):  ID of the last sequence; default=None.
+                                      If None, take the last existing sequence ID matching the filename_template.
+        filename_template (str):      A template string, where {} serves as a placeholder for the filename;
+                                      default="trj/dyn{}.dcd".
+        topology_file (str):          Filename of the topology file (pdb or psf); default="system.pdb".
+        select_atoms (str or list of int): A selection of atoms; default="all".
+        time_between_frames (float): The time between trajectory frames in picoseconds; default=1.
+        num_frames_per_trajectory (int or None): The number of frames in each sequence; default=None.
+                                      If None, infer the the number of frames from the first sequence that is read in.
+        infer_time (bool):            Whether the time field in the trajectory should be inferred heuristically from
+                                      the time between frames and number of frames per trajectory file.
+        load_function (callable):     The function used to load the files, default: md.load_dcd.
+
 
     For trajectory files that were created using the rickflow workflow, the class
     is used as follows:
 
-    >>> trajectories = CharmmTrajectoryIterator()
+    >>> trajectories = TrajectoryIterator()
     >>> for traj in trajectories:
-    >>>     ...
+    >>>     pass  # do stuff here
+
+    It also supports querying the length and getting individual sequences via
+
+    >>> len(trajectories)
+    and
+    >>> trajectories[i]
 
     Analysis classes in the rflow package are written so that they can be iteratively
-    called on trajectories. For example, for assembling transition matrices, call:
+    called on trajectories. For example, for tabulating the box dimensions, call:
 
-    >>>
+    >>> from rflow import TimeSeries, BoxSize
+    >>> boxsize = TimeSeries(BoxSize(), filename="boxsize.txt")
+    >>> for traj in trajectories:
+    >>>     boxsize(traj)
+
     """
     def __init__(self, first_sequence=None, last_sequence=None,
                  filename_template="trj/dyn{}.dcd", topology_file="system.pdb",
-                 selection="all", load_function=md.load_dcd):
+                 atom_selection="all", time_between_frames=1.0, num_frames_per_trajectory=None,
+                 infer_time=True, load_function=md.load_dcd):
 
         # select sequences
         trajectory_files = glob.glob(filename_template.format("*"))
@@ -70,11 +99,12 @@ class CharmmTrajectoryIterator(object):
         self.topology = make_topology(topology_file)
 
         # create selection
-        if isinstance(selection, str):
-            self.selection = self.topology.select(selection)
-        else:
-            self.selection = selection
+        self.selection = select_atoms(self.topology, atom_selection)
 
+        # initialize time
+        self.infer_time = infer_time
+        self.time_between_frames = float(time_between_frames)
+        self.num_frames_per_trajectory = num_frames_per_trajectory
         self.load_function = load_function
 
     def __iter__(self):
@@ -83,6 +113,7 @@ class CharmmTrajectoryIterator(object):
                                             top=self.topology,
                                             atom_indices=self.selection)
             trajectory.i = i
+            self._infer_time(trajectory, i)
             yield trajectory
 
     def __len__(self):
@@ -93,7 +124,32 @@ class CharmmTrajectoryIterator(object):
                                         top=self.topology,
                                         atom_indices=self.selection)
         trajectory.i = index
+        self._infer_time(trajectory, index)
         return trajectory
+
+    def _infer_time(self, trajectory, i):
+        """
+        Initialize the time field in the trajectory.
+        As of now, mdtraj does not read and write time information to and from dcd files correctly.
+        Therefore, time is manually assigned here assuming that each trajectory sequence has the same
+        number of frames as the one that is read first.
+        """
+        if self.infer_time:
+            # initialize time information
+            if self.num_frames_per_trajectory is None:
+                self.num_frames_per_trajectory = trajectory.n_frames
+            trajectory.time = np.arange(
+                (i-1) * self.num_frames_per_trajectory * self.time_between_frames,
+                ((i-1) * self.num_frames_per_trajectory + trajectory.n_frames) * self.time_between_frames,
+                step=self.time_between_frames
+            )
+
+
+class CharmmTrajectoryIterator(TrajectoryIterator):
+    """Old name for the trajectory iterator."""
+    def __init__(self, *args, **kwargs):
+        warnings.warn("The CharmmTrajectoryIterator has been renamed into TrajectoryIterator.", DeprecationWarning)
+        super(CharmmTrajectoryIterator, self).__init__(*args, **kwargs)
 
 
 def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
@@ -115,7 +171,7 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
     """
     membrane_center = center_of_mass_of_selection(trajectory, com_selection, coordinates)
 
-    selected = selection(trajectory, subselect)
+    selected = select_atoms(trajectory, subselect)
     # normalize z coordinates: scale to [0,1] and shift membrane center to 0.5
     z_normalized = trajectory.xyz[:, selected,
                    coordinates].transpose() - membrane_center.transpose()
@@ -146,7 +202,7 @@ def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1
             return np.array(0.0)
         else:
             return np.array([0.0]*len(coordinates))
-    selected_atom_ids = selection(trajectory, com_selection)
+    selected_atom_ids = select_atoms(trajectory, com_selection)
 
     for i, a in enumerate(trajectory.topology.atoms):
         assert i == a.index

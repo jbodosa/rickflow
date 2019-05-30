@@ -13,7 +13,7 @@ import numpy as np
 import mdtraj as md
 from simtk import unit as u
 
-from rflow.utility import selection, increment_using_multiindices
+from rflow.utility import select_atoms, increment_using_multiindices
 from rflow.trajectory import normalize
 from rflow.exceptions import RickFlowException
 
@@ -26,7 +26,7 @@ class TransitionCounter(object):
 
         Usage on trajectories that have been created using the rflow standard protocol:
 
-        >>> from rickflow import CharmmTrajectoryIterator as TI
+        >>> from rickflow import TrajectoryIterator as TI
         >>> trans_counter = TransitionCounter([10,20], 10, [0,1,2,3])
         >>> for frame in TI():
         >>>     trans_counter(frame)
@@ -170,8 +170,10 @@ class PermeationEventCounter(object):
         self.last_functional_bin = np.array([-999999 for _ in solute_ids],
                                             dtype=np.int32)
         self.events = []
+        self.severe_warnings = []
+        self._num_mild_warnings = 0
         self.initialize_all_permeants = initialize_all_permeants
-        self.critical_transitions = self.make_critical_transitions()
+        self.severely_critical_transitions, self.mildly_critical_transitions = self.make_critical_transitions()
 
     @property
     def num_crossings(self):
@@ -180,17 +182,32 @@ class PermeationEventCounter(object):
             if e["type"]=="crossing": n += 1
         return n
 
+    @property
+    def num_severe_warnings(self):
+        return len(self.severe_warnings)
+
+    @property
+    def num_mild_warnings(self):
+        return self._num_mild_warnings
+
     def _sanity_check(self, z_digitized_i, frame):
         # sanity check: particles should not hop over two or more bin
         # neither should they hop over the central bin
         if self.previous_z_digitized is not None:
-            critical_transitions = np.where(self.critical_transitions[self.previous_z_digitized, z_digitized_i])[0]
-            if critical_transitions.any():
-                for i in critical_transitions:
+            severely_critical_transitions = np.where(
+                self.severely_critical_transitions[self.previous_z_digitized, z_digitized_i])[0]
+            mildly_critical_transitions = np.where(
+                self.mildly_critical_transitions[self.previous_z_digitized, z_digitized_i])[0]
+            if severely_critical_transitions.any():
+                for i in severely_critical_transitions:
                     warn("An infeasible transition was detected for particle {} in trajectory frame {} (bin {} to {})."
                          " This might or might not have been a transit through the bilayer. It is not counted as a"
                          " permeation event.".format(self.solute_ids[i], frame, self.previous_z_digitized[i],
                                                      z_digitized_i[i]))
+                    self.severe_warnings += [{"frame": frame, "atom": self.solute_ids[i],
+                                              "source_bin": self.previous_z_digitized[i],
+                                              "target_bin": z_digitized_i[i]}]
+            self._num_mild_warnings += mildly_critical_transitions.sum()
         self.previous_z_digitized = np.copy(z_digitized_i)
 
     def __call__(self, trajectory):
@@ -274,20 +291,25 @@ class PermeationEventCounter(object):
 
     @staticmethod
     def make_critical_transitions():
-        critical_transitions = np.ones((7, 7), dtype=bool)
+        severe = np.ones((7, 7), dtype=bool)
+        mild = np.zeros((7, 7), dtype=bool)
         for i in range(7):
             # transitions from bin i to bin i are not critical
-            critical_transitions[i, i] = False
+            severe[i, i] = False
             # transitions from bin i to bin i+1 are not critical
-            critical_transitions[i, i-1] = False
-            critical_transitions[i-1, i] = False
-            # most hops over one bin are not critical
-            critical_transitions[i, i-2] = False
-            critical_transitions[i-2, i] = False
-        # The only critical hop is the one over the central bin
-        critical_transitions[2,4] = True
-        critical_transitions[4,2] = True
-        return critical_transitions
+            severe[i, i-1] = False
+            severe[i-1, i] = False
+            # most hops over one bin are not severely critical
+            severe[i, i-2] = False
+            mild[i, i-2] = True
+            severe[i-2, i] = False
+            mild[i-2, i] = True
+        # The only severely critical hop is the one over the central bin
+        severe[2,4] = True
+        mild[2,4] = False
+        severe[4,2] = True
+        mild[4,2] = False
+        return severe, mild
 
     def permeability(self, permeant_distribution, start_frame=0, end_frame=None,
                      time_between_frames=1*u.picosecond, mode='crossings', num_bins_in_water=2):
@@ -339,7 +361,6 @@ class PermeationEventCounter(object):
 class Distribution(object):
     def __init__(self, atom_selection, coordinate, nbins=100, com_selection=None):
         """
-
         Args:
             atom_selection:
             coordinate:
@@ -374,7 +395,7 @@ class Distribution(object):
         return - np.log(self.counts / np.max(self.counts))
 
     def __call__(self, trajectory):
-        atom_ids = selection(trajectory, self.atom_selection)
+        atom_ids = select_atoms(trajectory, self.atom_selection)
         normalized = normalize(trajectory, self.coordinate, subselect=atom_ids, com_selection=self.com_selection)
         box_size = trajectory.unitcell_lengths[:, self.coordinate]
         self.average_box_size = self.n_frames * self.average_box_size + trajectory.n_frames * box_size.mean()

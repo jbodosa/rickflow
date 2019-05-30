@@ -252,9 +252,7 @@ class NearestNeighborAnalysis(BinEdgeUpdater):
             self.dummy_frame.xyz[0] = traj.xyz[i]
             self.dummy_frame.time[0] = traj.time[i]
             self.dummy_frame.unitcell_lengths[0] = traj.unitcell_lengths[i]
-            self.dummy_frame.unitcell_volumes[0] = traj.unitcell_volumes[i]
             self.dummy_frame.unitcell_angles[0] = traj.unitcell_angles[i]
-            self.dummy_frame.unitcell_vectors[0] = traj.unitcell_vectors[i]
         return md.compute_distances(self.dummy_frame, self.permeant_chain_pairs, periodic=True, opt=True)
 
 

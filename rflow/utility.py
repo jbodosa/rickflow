@@ -32,23 +32,27 @@ class CWD(object):
         return True
 
 
-def selection(trajectory, sel):
+def select_atoms(topology_from, sel):
     """
     A short helper function to enable selection via atom ids or selection strings.
 
     Args:
-        trajectory: A mdtraj trajectory.
+        topology_from (mdtraj.Trajectory or mdtraj.Topology): The object defining the topology.
         sel: Either a selection string or a list of atom ids.
 
     Returns:
         list of int: Selected atom ids.
     """
+    if hasattr(topology_from, "topology"):
+        topology = topology_from.topology
+    else:
+        topology = topology_from
     if sel is None:
         return []
     elif isinstance(sel, list) or isinstance(sel, np.ndarray):
         return sel
     else:
-        return trajectory.topology.select(sel)
+        return topology.select(sel)
 
 
 def mydigitize(array, nbins, range):

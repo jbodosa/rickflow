@@ -9,7 +9,7 @@ from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
-from rflow.utility import increment_using_multiindices, selection, CWD, abspath
+from rflow.utility import increment_using_multiindices, select_atoms, CWD, abspath
 from rflow.observables import TimeSeries, AreaPerLipid, Coordinates, BoxSize, BinEdgeUpdater
 from rflow.biasing import *
 from rflow.analyze_diffusion import *

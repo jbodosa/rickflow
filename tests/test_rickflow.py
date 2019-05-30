@@ -5,16 +5,18 @@
 
 import pytest
 
-from rflow import RickFlow, CWD
+from rflow import RickFlow, CWD, TrajectoryIterator
 from rflow.utility import abspath
 import glob
 import shutil
 import os
 import subprocess
 import pytest
+import numpy as np
 from simtk import unit as u
 from simtk.openmm import LangevinIntegrator
 from simtk.openmm.app.internal.charmm.exceptions import CharmmPSFWarning
+import mdtraj as md
 
 pytestmark = pytest.mark.filterwarnings("ignore:Detected PSF molecule section that is WRONG")
 
@@ -69,8 +71,15 @@ def run_and_restart(tmpdir_factory):
 
 
 def test_run_and_restart(run_and_restart):
+    assert os.path.isfile(os.path.join(run_and_restart.work_dir, "out", "out1.txt"))
+    assert os.path.isfile(os.path.join(run_and_restart.work_dir, "trj", "dyn1.dcd"))
     assert os.path.isfile(os.path.join(run_and_restart.work_dir, "out", "out2.txt"))
     assert os.path.isfile(os.path.join(run_and_restart.work_dir, "trj", "dyn2.dcd"))
+    # check dcd file sanity
+    with CWD(run_and_restart.work_dir):
+        trajectories = TrajectoryIterator(time_between_frames=0.01)
+        trajectory = trajectories[2]
+    assert np.all(trajectory.time == np.array([0.02, 0.03]))
 
 
 @pytest.mark.skipif(True, reason="requires a working CHARMM installation 'c41n1'")
