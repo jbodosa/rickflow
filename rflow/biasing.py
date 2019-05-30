@@ -299,3 +299,24 @@ class RelativePartialCenterOfMassRestraint(object):
             z_com += positions[i][2] * masses[i]
         z_com /= total_mass
         return self.force_constant * (z_com/box_height - self.position)**2
+
+
+class ConstantPullingForce(object):
+    def __init__(self, force, coordinate=2):
+        self.force = force
+        self.coordinate = coordinate
+
+    def __str__(self):
+        return "- force * {}".format("xyz"[self.coordinate])
+
+    def as_openmm_force(self, particle_ids=[]):
+        biasing_force = CustomExternalForce(str(self))
+        biasing_force.addGlobalParameter("force", self.force)
+        for particle in particle_ids:
+            biasing_force.addParticle(particle)
+        return biasing_force
+
+    def __call__(self, z):
+        return - self.force * z
+
+

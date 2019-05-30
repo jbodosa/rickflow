@@ -3,7 +3,7 @@ Tests for biasing tools.
 """
 
 from rflow import biasing
-from rflow.biasing import FreeEnergyCosineSeries, RelativePartialCenterOfMassRestraint
+from rflow.biasing import FreeEnergyCosineSeries, RelativePartialCenterOfMassRestraint, ConstantPullingForce
 from rflow.utility import abspath
 
 import pytest
@@ -13,7 +13,7 @@ import os
 import random
 import numpy as np
 
-from simtk.openmm import System, Context, LangevinIntegrator
+from simtk.openmm import System, Context, LangevinIntegrator, VerletIntegrator
 from simtk.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
 from simtk import unit as u
 
@@ -148,3 +148,25 @@ def test_partial_com_restraint():
             bias(positions, [1.0*u.dalton,2.0*u.dalton], box_length).value_in_unit(u.kilojoule_per_mole),
             abs=1e-4
         )
+
+
+def test_constant_pull_periodic():
+    force = 10.0 * u.kilojoule_per_mole / u.nanometer
+    constant_pulling_force = ConstantPullingForce(force)
+    mass = 1.0 * u.amu
+    system = System()
+    system.addParticle(mass)
+    system.addForce(constant_pulling_force.as_openmm_force([0]))
+    integrator = VerletIntegrator(1.0 * u.femtosecond)
+    context = Context(system, integrator)
+    context.setPeriodicBoxVectors(*np.eye(3) * 1.0 * u.nanometer)
+    context.setPositions([[0.0,0.0,0.0]])
+    context.setVelocities([[0.0,0.0,0.0]])
+    for i in range(1000):
+        integrator.step(1)
+        state = context.getState(getPositions=True)
+        t = state.getTime()
+        z = (state.getPositions()[0][2]).value_in_unit(u.nanometer)
+        analytic_solution = (0.5*force/mass*t**2).value_in_unit(u.nanometer)
+        assert z == pytest.approx(analytic_solution, abs=0.01)
+
