@@ -22,7 +22,7 @@ import mdtraj as md
 
 from rflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
 from rflow.utility import CWD
-from rflow import omm_vfswitch
+from rflow import omm_vfswitch, select_atoms
 
 
 def get_next_seqno_and_checkpoints(work_dir="."):
@@ -219,7 +219,9 @@ class RickFlow(object):
                               if "TIP" not in self.crd.resname[i]
                               ]
                 center_around = non_waters
-            current_com = self.centerOfMass(non_waters)
+            else:
+                center_around = select_atoms(self._omm_topology, center_around)
+            current_com = self.centerOfMass(center_around)
             target_com = 0.5 * self.psf.boxLengths
             move = target_com - current_com
             self.crd.positions += move
