@@ -220,7 +220,7 @@ class RickFlow(object):
                               ]
                 center_around = non_waters
             else:
-                center_around = select_atoms(self.psf.topology, center_around)
+                center_around = select_atoms(md.Topology.from_openmm(self.psf.topology), center_around)
             current_com = self.centerOfMass(center_around)
             target_com = 0.5 * self.psf.boxLengths
             move = target_com - current_com
