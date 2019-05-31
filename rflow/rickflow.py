@@ -127,7 +127,8 @@ class RickFlow(object):
                  steps_per_sequence=1000000,
                  use_only_xml_restarts=False,
                  misc_psf_create_system_kwargs={},
-                 initialize_velocities=True
+                 initialize_velocities=True,
+                 center_around=None
                  ):
         """
         The constructor sets up the system.
@@ -155,6 +156,7 @@ class RickFlow(object):
                 arguments of the CharmmPsfFile.createSystem() call.
             use_only_xml_restarts (bool): If True, always use state files for restarts.
                 If False, try checkpoint file first.
+            center_around (selection or None): If None, center the system around all non-TIP3Ps.
         """
 
         self.work_dir = work_dir
@@ -212,9 +214,11 @@ class RickFlow(object):
 
         # translate system so that the center of mass of non-waters is in the middle
         if recenter_coordinates:
-            non_waters = [i for i in range(self.crd.natom)
-                          if "TIP" not in self.crd.resname[i]
-                          ]
+            if center_around is None:
+                non_waters = [i for i in range(self.crd.natom)
+                              if "TIP" not in self.crd.resname[i]
+                              ]
+                center_around = non_waters
             current_com = self.centerOfMass(non_waters)
             target_com = 0.5 * self.psf.boxLengths
             move = target_com - current_com
