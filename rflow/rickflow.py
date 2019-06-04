@@ -128,7 +128,8 @@ class RickFlow(object):
                  use_only_xml_restarts=False,
                  misc_psf_create_system_kwargs={},
                  initialize_velocities=True,
-                 center_around=None
+                 center_around=None,
+                 analysis_mode=False
                  ):
         """
         The constructor sets up the system.
@@ -156,13 +157,17 @@ class RickFlow(object):
                 arguments of the CharmmPsfFile.createSystem() call.
             use_only_xml_restarts (bool): If True, always use state files for restarts.
                 If False, try checkpoint file first.
-            center_around (selection or None): If None, center the system around all non-TIP3Ps.
+            center_around (selection or None): Center initial system around the selection.
+                If None, center the system around all non-TIP3Ps.
+            analysis_mode (bool): If True, create the workflow in its initial state without
+                setting up the directory structure or requiring a GPU.
         """
 
         self.work_dir = work_dir
-        self.next_seqno, self.current_checkpoint, self.current_state = (
-            get_next_seqno_and_checkpoints(self.work_dir)
-        )
+        if not analysis_mode:
+            self.next_seqno, self.current_checkpoint, self.current_state = (
+                get_next_seqno_and_checkpoints(self.work_dir)
+            )
         self.gpu_id = gpu_id
         # prepare temporary output directory
         if tmp_output_dir is not None:
@@ -243,6 +248,7 @@ class RickFlow(object):
         self.simulation = None
         self._omm_topology = None
         self.initialize_velocities = initialize_velocities
+        self.analysis_mode = analysis_mode
 
     @property
     def system(self):
@@ -283,7 +289,7 @@ class RickFlow(object):
         """
         if self.use_vdw_force_switch:
             self.apply_vdw_force_switch(switch_distance=self._switch_distance, cutoff_distance=self._cutoff_distance)
-        if self.gpu_id is not None:
+        if self.gpu_id is not None and not self.analysis_mode:
             platform, platform_properties = require_cuda(self.gpu_id)
         else:
             platform = None
@@ -299,16 +305,17 @@ class RickFlow(object):
             self._initializeState()
             # write the system as a pdb file (this is important for postprocessing,
             # if virtual sites were manually added to the system)
-            PDBReporter("system.pdb", 1).report(
-                self.simulation, self.context.getState(getPositions=True)
-            )
-            print("#Running on ", self.context.getPlatform().getName())
+            if not self.analysis_mode:
+                PDBReporter("system.pdb", 1).report(
+                    self.simulation, self.context.getState(getPositions=True)
+                )
+                print("#Running on ", self.context.getPlatform().getName())
 
     def _initializeState(self):
         """
         Initialize state, use checkpoint for seqno > 1.
         """
-        if self.next_seqno == 1:
+        if self.analysis_mode or self.next_seqno == 1:
             print("Setting up from initial coordinates.")
             if self.psf.topology.getPeriodicBoxVectors():
                 self.context.setPeriodicBoxVectors(
@@ -359,6 +366,8 @@ class RickFlow(object):
         """
         Run the simulation.
         """
+        if self.analysis_mode:
+            raise RickFlowException("Cannot run an instance that has been created with analysis_mode=True.")
         # define output for the current run
         output_dir = self.work_dir if self.tmp_output_dir is None else self.tmp_output_dir
         with CWD(output_dir):

@@ -5,7 +5,7 @@
 
 import pytest
 
-from rflow import RickFlow, CWD, TrajectoryIterator
+from rflow import RickFlow, CWD, TrajectoryIterator, RickFlowException
 from rflow.utility import abspath
 import glob
 import shutil
@@ -112,4 +112,23 @@ def test_forces(rickflow_instance):
             assert force.getUseDispersionCorrection() is False
         if hasattr(force, "getUseLongRangeCorrection"):
             assert force.getUseLongRangeCorrection() is False
+
+
+def test_analysis_mode(tmpdir):
+    work_dir = str(tmpdir)
+    with CWD(work_dir):
+        flow = RickFlow(
+            toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
+            psf=abspath("data/2dlpc.psf"),
+            crd=abspath("data/rb2dlpc.crd"),
+            box_dimensions=[47.7695166, 47.7695166, 137.142387],
+            work_dir=".",
+            misc_psf_create_system_kwargs={"constraints": None},
+            analysis_mode=True
+        )
+    flow.prepareSimulation(LangevinIntegrator(1, 1, 1))
+    with pytest.raises(RickFlowException):
+        flow.run()
+    assert os.listdir(work_dir) == []
+
 
