@@ -10,15 +10,15 @@ import pickle
 
 import numpy as np
 
-import mdtraj as md
 from simtk import unit as u
 
-from rflow.utility import select_atoms, increment_using_multiindices
+from rflow.utility import increment_using_multiindices
+from rflow.observables import BinEdgeUpdater
 from rflow.trajectory import normalize
 from rflow.exceptions import RickFlowException
 
 
-class TransitionCounter(object):
+class TransitionCounter(BinEdgeUpdater):
     """
     A class to extract transitions matrices.
 
@@ -33,35 +33,17 @@ class TransitionCounter(object):
         >>> print(frame.matrices)
     """
     def __init__(self, lag_iterations, num_bins, solute, membrane=None):
+        super(TransitionCounter, self).__init__(num_bins, coordinate=2)
         self.lag_iterations = lag_iterations
         self.fifo_positions = [None for _ in range(max(lag_iterations) + 1)]
         self.matrices = {lag: np.zeros((num_bins, num_bins), dtype=np.int32)
                          for lag in lag_iterations}
-        self.num_bins = num_bins
         self.solute = solute
         self.membrane = membrane
-        self.n_frames = 0
-        self.average_box_height = 0.0
-
-    @property
-    def edges(self):
-        return np.arange(0.0, self.average_box_height + 1e-6,
-                         self.average_box_height/self.num_bins)
-
-    @property
-    def edges_around_zero(self):
-        return np.arange(-0.5*self.average_box_height,
-                         0.5*self.average_box_height + 1e-6,
-                         self.average_box_height/self.num_bins)
 
     def __call__(self, trajectory):
+        super(TransitionCounter, self).__call__(trajectory)
         z_normalized = normalize(trajectory, 2, self.membrane, self.solute)
-
-        # update edges
-        self.average_box_height = (self.average_box_height * self.n_frames
-                                   + np.mean(trajectory.unitcell_lengths[:, 2]) * trajectory.n_frames)
-        self.n_frames += trajectory.n_frames
-        self.average_box_height /= self.n_frames
 
         # find bin indices
         h = 1.0 / self.num_bins
@@ -364,67 +346,5 @@ class PermeationEventCounter(object):
                        [0.5*exponential[0]] + exponential[1:-1].tolist() + [0.5*exponential[-1]]))
         # Calculate permeability
         return (fe_integral / (factor*num_permeants) * (num_events / tsim)).value_in_unit(u.centimeter/u.second)
-
-
-class Distribution(object):
-    def __init__(self, atom_selection, coordinate, nbins=100, com_selection=None):
-        """
-        Args:
-            atom_selection:
-            coordinate:
-            nbins:
-            com_selection: List of atom ids to calculate the com of the membrane, to make the distribution relative to
-                    the center of mass.
-        """
-        self.atom_selection = atom_selection
-        self.coordinate = coordinate
-        self.average_box_size = 0.0
-        self.n_frames = 0
-        self.bins = np.arange(0, 1.0 + 1e-6, 1.0/nbins)
-        self.nbins = nbins
-        self.counts = 0.0
-        self.com_selection = com_selection
-
-    @property
-    def bin_centers(self):
-        return self.average_box_size * (self.bins[:-1] + 0.5*self.bins[1])
-
-    @property
-    def bin_centers_around_zero(self):
-        return self.average_box_size * (self.bins[:-1] + 0.5 * self.bins[1] - 0.5)
-
-    @property
-    def probability(self):
-        return self.counts / self.counts.sum()
-
-    @property
-    def free_energy(self):
-        """in kBT"""
-        return - np.log(self.counts / np.max(self.counts))
-
-    def __call__(self, trajectory):
-        atom_ids = select_atoms(trajectory, self.atom_selection)
-        normalized = normalize(trajectory, self.coordinate, subselect=atom_ids, com_selection=self.com_selection)
-        box_size = trajectory.unitcell_lengths[:, self.coordinate]
-        self.average_box_size = self.n_frames * self.average_box_size + trajectory.n_frames * box_size.mean()
-        self.n_frames += trajectory.n_frames
-        self.average_box_size /= self.n_frames
-
-        histogram = np.histogram(normalized, bins=self.nbins, range=(0,1))  # this is !much! faster than manual bins
-        self.counts = self.counts + histogram[0]
-
-    def save(self, filename):
-        data = np.array([self.bin_centers, self.bin_centers_around_zero, self.counts,
-                         self.probability, self.free_energy])
-        np.savetxt(filename, data.transpose(),
-                   header="bin_centers, bin_centers_around_0, counts, probability, free_energy_(kBT)\n")
-
-        with open(filename + ".pic", 'wb') as pic:
-            pickle.dump(self, pic)
-
-    @staticmethod
-    def load_from_pic(filename):
-        with open(filename, 'rb') as pic:
-            return pickle.load(pic)
 
 

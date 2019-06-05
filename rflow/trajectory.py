@@ -178,7 +178,7 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
 
     z_normalized /= trajectory.unitcell_lengths[:, coordinates].transpose()
 
-    if com_selection is not None:
+    if com_selection is not None and len(com_selection) > 0:
         z_normalized += 0.5  # shift so that com is at 0.5
 
     z_normalized = np.mod(z_normalized, 1.0).transpose()
@@ -197,7 +197,7 @@ def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1
     Returns:
 
     """
-    if com_selection is None:
+    if com_selection is None or len(com_selection) == 0:
         if isinstance(coordinates, int):
             return np.array(0.0)
         else:
@@ -210,5 +210,5 @@ def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1
     center_of_mass = np.einsum(
         "i,ni...->n...", masses[selected_atom_ids], trajectory.xyz[:, selected_atom_ids])
     center_of_mass /= np.sum(masses[selected_atom_ids])
-    return center_of_mass[:,coordinates]
+    return center_of_mass[:, coordinates]
 

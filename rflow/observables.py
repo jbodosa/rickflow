@@ -3,9 +3,10 @@ Tools for analyzing MD observables
 """
 
 import os
+import pickle
 import numpy as np
-from rflow.analyze_diffusion import normalize
-import mdtraj as md
+from rflow.trajectory import normalize
+from rflow.utility import select_atoms
 
 
 class TimeSeries(object):
@@ -127,3 +128,49 @@ class BinEdgeUpdater(object):
         edges = self.edges
         return 0.5*(edges[:-1] + edges[1:])
 
+
+class Distribution(BinEdgeUpdater):
+    def __init__(self, atom_selection, coordinate, nbins=100, com_selection=None):
+        """
+        Args:
+            atom_selection:
+            coordinate:
+            nbins:
+            com_selection: List of atom ids to calculate the com of the membrane, to make the distribution relative to
+                    the center of mass.
+        """
+        super(Distribution, self).__init__(num_bins=nbins, coordinate=coordinate)
+        self.atom_selection = atom_selection
+        self.counts = 0.0
+        self.com_selection = com_selection
+
+    @property
+    def probability(self):
+        return self.counts / self.counts.sum()
+
+    @property
+    def free_energy(self):
+        """in kBT"""
+        return - np.log(self.counts / np.max(self.counts))
+
+    def __call__(self, trajectory):
+        super(Distribution, self).__call__(trajectory)
+        atom_ids = select_atoms(trajectory, self.atom_selection)
+        com_ids = select_atoms(trajectory, self.com_selection)
+        normalized = normalize(trajectory, self.coordinate, subselect=atom_ids, com_selection=com_ids)
+        histogram = np.histogram(normalized, bins=self.num_bins, range=(0, 1))  # this is !much! faster than manual bins
+        self.counts = self.counts + histogram[0]
+
+    def save(self, filename):
+        data = np.array([self.bin_centers, self.bin_centers_around_zero, self.counts,
+                         self.probability, self.free_energy])
+        np.savetxt(filename, data.transpose(),
+                   header="bin_centers, bin_centers_around_0, counts, probability, free_energy_(kBT)\n")
+
+        with open(filename + ".pic", 'wb') as pic:
+            pickle.dump(self, pic)
+
+    @staticmethod
+    def load_from_pic(filename):
+        with open(filename, 'rb') as pic:
+            return pickle.load(pic)

@@ -49,10 +49,10 @@ def select_atoms(topology_from, sel):
         topology = topology_from
     if sel is None:
         return []
-    elif isinstance(sel, list) or isinstance(sel, np.ndarray):
-        return sel
-    else:
+    elif isinstance(sel, str):
         return topology.select(sel)
+    else:
+        return sel
 
 
 def mydigitize(array, nbins, range):

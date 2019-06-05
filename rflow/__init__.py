@@ -10,12 +10,13 @@ __version__ = get_versions()['version']
 del get_versions
 
 from rflow.utility import increment_using_multiindices, select_atoms, CWD, abspath
-from rflow.observables import TimeSeries, AreaPerLipid, Coordinates, BoxSize, BinEdgeUpdater
+from rflow.trajectory import (TrajectoryIterator, CharmmTrajectoryIterator, make_topology, normalize,
+                              center_of_mass_of_selection)
+from rflow.observables import TimeSeries, AreaPerLipid, Coordinates, BoxSize, BinEdgeUpdater, Distribution
 from rflow.biasing import *
-from rflow.analyze_diffusion import *
+from rflow.analyze_diffusion import TransitionCounter, PermeationEventCounter
 from rflow.biasing import *
 from rflow.exceptions import *
 from rflow.integrators import NonequilibriumLangevinIntegrator
 from rflow.rickflow import *
-from rflow.trajectory import *
 from rflow.nearest import NearestNeighborAnalysis, NearestNeighborResult

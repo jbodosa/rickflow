@@ -2,10 +2,11 @@
 
 """
 
-from rflow.observables import *
 import os
+import warnings
 import numpy as np
-from pytest import approx, fixture
+from pytest import approx
+from rflow.observables import *
 
 
 def test_statistical_quantity():
@@ -95,3 +96,22 @@ def test_evaluator_with_file(tmpdir):
     assert retrieved[2] == 6
 
 
+def test_distribution(whex_iterator):
+    dist = Distribution(atom_selection=[51], coordinate=2, nbins=10)
+    for seq in whex_iterator:
+        dist(seq)
+    assert dist.counts.shape == (10,)
+    assert dist.counts.sum() == 200*1
+
+
+def test_distribution_save(whex_iterator, tmpdir):
+    datafile = os.path.join(str(tmpdir), "distribution.txt")
+    dist = Distribution(atom_selection=[51], coordinate=2, nbins=10)
+    for seq in whex_iterator:
+        dist(seq)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        dist.save(datafile)
+    loaded = np.loadtxt(datafile)
+    assert loaded.shape == (10, 5)
+    Distribution.load_from_pic(datafile + ".pic")
