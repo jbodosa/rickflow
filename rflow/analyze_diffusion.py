@@ -12,6 +12,7 @@ import numpy as np
 
 from simtk import unit as u
 
+import rflow.observables
 from rflow.utility import increment_using_multiindices
 from rflow.observables import BinEdgeUpdater
 from rflow.trajectory import normalize
@@ -348,3 +349,7 @@ class PermeationEventCounter(object):
         return (fe_integral / (factor*num_permeants) * (num_events / tsim)).value_in_unit(u.centimeter/u.second)
 
 
+class Distribution(rflow.observables.Distribution):
+    def __init__(self, *args, **kwargs):
+        super(Distribution, self).__init__(*args, **kwargs)
+        raise DeprecationWarning("The Distribution class has moved from rflow.analyze_diffusion to rflow.observables.")
