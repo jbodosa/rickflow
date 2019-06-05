@@ -161,6 +161,24 @@ class Distribution(BinEdgeUpdater):
         histogram = np.histogram(normalized, bins=self.num_bins, range=(0, 1))  # this is !much! faster than manual bins
         self.counts = self.counts + histogram[0]
 
+    def __add__(self, other):
+        assert self.atom_selection == other.atom_selection
+        assert self.com_selection == other.com_selection
+        assert self.num_bins == other.num_bins
+        assert self.coordinate == other.coordinate
+        sumdist = Distribution(self.atom_selection, self.coordinate, self.num_bins, self.com_selection)
+        sumdist.counts = self.counts + other.counts
+        sumdist.n_frames = self.n_frames + other.n_frames
+        sumdist.average_box_size = ((self.average_box_size * self.n_frames + other.average_box_size * other.n_frames)
+                                    / sumdist.n_frames)
+        return sumdist
+
+    def __radd__(self, other):
+        if other == 0:
+            return self
+        else:
+            return self.__add__(self, other)
+
     def save(self, filename):
         data = np.array([self.bin_centers, self.bin_centers_around_zero, self.counts,
                          self.probability, self.free_energy])

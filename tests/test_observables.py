@@ -115,3 +115,16 @@ def test_distribution_save(whex_iterator, tmpdir):
     loaded = np.loadtxt(datafile)
     assert loaded.shape == (10, 5)
     Distribution.load_from_pic(datafile + ".pic")
+
+
+def test_distribution_add(whex_iterator):
+    dist = Distribution(atom_selection=[51], coordinate=2, nbins=10)
+    dist2 = Distribution(atom_selection=[51], coordinate=2, nbins=10)
+    dist3 = Distribution(atom_selection=[51], coordinate=2, nbins=10)
+    for seq in whex_iterator:
+        dist(seq)
+        dist2(seq)
+        dist3(seq)
+    sum_dist = sum([dist, dist2, dist3])
+    assert sum_dist.average_box_size == (dist.average_box_size + dist2.average_box_size + dist3.average_box_size)/3
+    assert (sum_dist.counts == dist.counts + dist2.counts + dist3.counts).all()
