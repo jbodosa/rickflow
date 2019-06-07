@@ -6,7 +6,6 @@ Analysis tools for diffusivity and membrane permeation.
 
 
 from warnings import warn
-import pickle
 
 import numpy as np
 
@@ -161,10 +160,9 @@ class PermeationEventCounter(object):
         self.last_functional_bin = np.array([-999999 for _ in solute_ids],
                                             dtype=np.int32)
         self.events = []
-        self.severe_warnings = []
-        self._num_mild_warnings = 0
+        self.num_transitions_between_bins = np.zeros((7, 7), dtype=int)
         self.initialize_all_permeants = initialize_all_permeants
-        self.severely_critical_transitions, self.mildly_critical_transitions = self.make_critical_transitions()
+        self.severe_warnings = []
 
     @property
     def num_crossings(self):
@@ -175,21 +173,27 @@ class PermeationEventCounter(object):
 
     @property
     def num_severe_warnings(self):
-        return len(self.severe_warnings)
-
-    @property
-    def num_mild_warnings(self):
-        return self._num_mild_warnings
+        return self.num_transitions_between_bins[2, 4] + self.num_transitions_between_bins[4, 2]
 
     def _sanity_check(self, z_digitized_i, frame):
-        # sanity check: particles should not hop over two or more bin
-        # neither should they hop over the central bin
+        # sanity check: particles should not hop over the central bin
         if self.previous_z_digitized is not None:
-            severely_critical_transitions = np.where(
-                self.severely_critical_transitions[self.previous_z_digitized, z_digitized_i])[0]
-            mildly_critical_transitions = np.where(
-                self.mildly_critical_transitions[self.previous_z_digitized, z_digitized_i])[0]
-            if severely_critical_transitions.any():
+            num_transitions_between_bins = np.zeros((7, 7), dtype=int)
+            np.add.at(num_transitions_between_bins, (self.previous_z_digitized, z_digitized_i), 1)
+            self.num_transitions_between_bins += num_transitions_between_bins
+            if num_transitions_between_bins[2, 4] + num_transitions_between_bins[4, 2] > 0:
+                severely_critical_transitions = np.where(
+                    np.logical_or(
+                        np.logical_and(
+                            self.previous_z_digitized == 2,
+                            z_digitized_i == 4
+                        ),
+                        np.logical_and(
+                            self.previous_z_digitized == 4,
+                            z_digitized_i == 2
+                        ),
+                    )
+                )
                 for i in severely_critical_transitions:
                     warn("An infeasible transition was detected for particle {} in trajectory frame {} (bin {} to {})."
                          " This might or might not have been a transit through the bilayer. It is not counted as a"
@@ -198,8 +202,6 @@ class PermeationEventCounter(object):
                     self.severe_warnings += [{"frame": frame, "atom": self.solute_ids[i],
                                               "source_bin": self.previous_z_digitized[i],
                                               "target_bin": z_digitized_i[i]}]
-            self._num_mild_warnings += mildly_critical_transitions.sum()
-        self.previous_z_digitized = np.copy(z_digitized_i)
 
     def __call__(self, trajectory):
         z_normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
@@ -270,20 +272,41 @@ class PermeationEventCounter(object):
                 self.events += [event]
 
             # update
-            self.last_water_bin[np.where(z_digitized[i] == 1)] = 1
-            self.last_water_bin[np.where(z_digitized[i] == 5)] = 5
+            self.last_water_bin[np.where(np.isin(z_digitized[i], [0, 1]))] = 1
+            self.last_water_bin[np.where(np.isin(z_digitized[i], [5, 6]))] = 5
+            # consider all transitions into the outer membrane that have not entered from the central bin as having
+            # entered through the water phase
+            if self.previous_z_digitized is not None:
+                self.last_functional_bin[np.where(
+                    np.logical_and(z_digitized[i] == 2, np.logical_not(np.isin(self.previous_z_digitized, [2, 3]))))] = 1
+                self.last_functional_bin[np.where(
+                    np.logical_and(z_digitized[i] == 4, np.logical_not(np.isin(self.previous_z_digitized, [4, 3]))))] = 5
+                self.last_water_bin[np.where(
+                    np.logical_and(z_digitized[i] == 2, np.logical_not(np.isin(self.previous_z_digitized, [2, 3]))))] = 1
+                self.last_water_bin[np.where(
+                    np.logical_and(z_digitized[i] == 4, np.logical_not(np.isin(self.previous_z_digitized, [4, 3]))))] = 5
             for b in self.functional_bins:
                 in_b = np.where(z_digitized[i] == b)[0]
                 self.last_functional_bin[in_b] = b
                 self.framenr_of_last_seen_in_functional_bin[b][in_b] = frame
+            self.previous_z_digitized = np.copy(z_digitized[i])
 
         # finalize
         self.startframe += trajectory.n_frames
 
     @staticmethod
     def make_critical_transitions():
-        severe = np.ones((7, 7), dtype=bool)
+        severe = np.zeros((7, 7), dtype=bool)
         mild = np.zeros((7, 7), dtype=bool)
+        # The only severely critical hop is the one over the central bin
+        severe[2, 4] = True
+        severe[4, 2] = True
+        # Mild warnings: All hops 0 1 [2 3 4] 5 6
+        mild[0, 3] = True
+        mild[3, 0] = True
+        mild[6, 3] = True
+        mild[3, 6] = True
+
         for i in range(7):
             # transitions from bin i to bin i are not critical
             severe[i, i] = False
@@ -295,11 +318,7 @@ class PermeationEventCounter(object):
             mild[i, i-2] = True
             severe[i-2, i] = False
             mild[i-2, i] = True
-        # The only severely critical hop is the one over the central bin
-        severe[2,4] = True
-        mild[2,4] = False
-        severe[4,2] = True
-        mild[4,2] = False
+
         return severe, mild
 
     def permeability(self, permeant_distribution, start_frame=0, end_frame=None,
