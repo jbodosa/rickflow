@@ -90,4 +90,5 @@ def test_permeation_warnings(whex_iterator):
     assert pcount.num_severe_warnings > 0
     #print(os.linesep, pcount.num_transitions_between_bins)
     assert pcount.num_severe_warnings == 10
+    print(pcount.severe_warnings)
 
