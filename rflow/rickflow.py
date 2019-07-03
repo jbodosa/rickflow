@@ -12,16 +12,16 @@ import random
 
 import simtk.unit as u
 from simtk.openmm import Platform
-from simtk.openmm import CustomNonbondedForce, NonbondedForce
+from simtk.openmm import CustomNonbondedForce, NonbondedForce, LangevinIntegrator
 from simtk.openmm.app import Simulation
 from simtk.openmm.app import CharmmPsfFile, CharmmParameterSet, CharmmCrdFile
-from simtk.openmm.app import LJPME, PME, HBonds
+from simtk.openmm.app import PME, HBonds
 from simtk.openmm.app import DCDFile, StateDataReporter, PDBReporter
 
 import mdtraj as md
 
 from rflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
-from rflow.utility import CWD
+from rflow.utility import CWD, get_barostat
 from rflow import omm_vfswitch, select_atoms
 
 
@@ -411,5 +411,69 @@ class RickFlow(object):
             self.next_seqno += 1
             with open("next.seqno", 'w') as fp:
                 fp.write(str(self.next_seqno))
+
+
+def equilibrate(workflow, target_temperature,
+                minimization_tolerance=10.000000000000004 * u.kilojoule/u.mole,
+                max_minimization_iterations=0,
+                number_of_equilibration_steps=100000,
+                start_temperature=100 * u.kelvin,
+                gpu_id=0
+                ):
+    """Energy minimization and gradual heating to get a stable starting configuration.
+
+    Args:
+        workflow: A RickFlow instance that has been prepared for simulation using RickFlow.prepareSimulation.
+        target_temperature:
+        minimization_tolerance:
+        max_minimization_iterations:
+        number_of_equilibration_steps:
+        start_temperature:
+        gpu_id:
+
+    Returns:
+
+    """
+    if workflow.simulation is None:
+        raise RickFlowException("equilibrate can only be called after preparing the simulation "
+                                "(RickFlow.prepareSimulation)")
+    barostat = get_barostat(workflow.system)
+    number_of_equilibration_steps //= 2  # two equilibration phases
+
+    with CWD(workflow.work_dir):
+        # set up simulation
+        integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond, 1.0 * u.femtosecond)
+        if gpu_id is not None:
+            platform, platform_properties = require_cuda(gpu_id=gpu_id)
+        else:
+            platform = None
+            platform_properties = None
+        equilibration = Simulation(workflow.psf.topology, workflow.system, integrator, platform, platform_properties)
+        equilibration.context.setPositions(workflow.positions)
+        equilibration.context.setPeriodicBoxVectors(*workflow.psf.topology.getPeriodicBoxVectors())
+
+        print("Starting Minimization...")
+        equilibration.minimizeEnergy(minimization_tolerance, max_minimization_iterations)
+        print("Minimization done.")
+
+        print("Starting heating ({} steps)...".format(number_of_equilibration_steps))
+        for i in range(number_of_equilibration_steps//100):
+            switch = (i*100)/number_of_equilibration_steps
+            temperature = (1-switch) * start_temperature + switch * target_temperature
+            integrator.setTemperature(temperature)
+            # apply temperature to barostat
+            if barostat is not None:
+                equilibration.context.setParameter(barostat.Temperature(), temperature)
+            equilibration.step(100)
+
+        print("...Running {} steps at target temperature...".format(number_of_equilibration_steps))
+        integrator.setTemperature(target_temperature)
+        if barostat is not None:
+            equilibration.context.setParameter(barostat.Temperature(), target_temperature)
+        equilibration.step(number_of_equilibration_steps)
+        print("Equilibration done.")
+
+        equilibration.saveState("equilibrated.xml")
+        workflow.simulation.loadState("equilibrated.xml")
 
 

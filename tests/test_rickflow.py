@@ -5,7 +5,7 @@
 
 import pytest
 
-from rflow import RickFlow, CWD, TrajectoryIterator, RickFlowException
+from rflow import RickFlow, CWD, TrajectoryIterator, RickFlowException, equilibrate
 from rflow.utility import abspath
 import glob
 import shutil
@@ -15,8 +15,7 @@ import pytest
 import numpy as np
 from simtk import unit as u
 from simtk.openmm import LangevinIntegrator
-from simtk.openmm.app.internal.charmm.exceptions import CharmmPSFWarning
-import mdtraj as md
+
 
 pytestmark = pytest.mark.filterwarnings("ignore:Detected PSF molecule section that is WRONG")
 
@@ -132,3 +131,30 @@ def test_analysis_mode(tmpdir):
     assert os.listdir(work_dir) == []
 
 
+def test_equilibrate(tmpdir):
+    for do_equilibration in [True, False]:
+        work_dir = os.path.join(str(tmpdir), str(do_equilibration))
+        os.mkdir(work_dir)
+        with CWD(work_dir):
+            flow = RickFlow(
+                toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
+                psf=abspath("data/water.psf"),
+                crd=abspath("data/water.crd"),
+                box_dimensions=[25.1984] * 3,
+                gpu_id=None,
+                steps_per_sequence=100,
+                table_output_interval=10,
+                dcd_output_interval=100,
+                recenter_coordinates=False
+            )
+            # compromise the particle positions to render the simulation unstable
+            flow.positions = (np.array(flow.positions) * 0.5).tolist()
+            flow.prepareSimulation(integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond))
+            if do_equilibration:
+                equilibrate(flow, 300.0*u.kelvin, gpu_id=None, number_of_equilibration_steps=1000,
+                            max_minimization_iterations=100)
+                flow.run()
+            else:
+                ## check that the simulation would fail without equilibration
+                with pytest.raises(ValueError):
+                    flow.run()
