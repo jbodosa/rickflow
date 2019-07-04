@@ -452,6 +452,11 @@ def equilibrate(workflow, target_temperature,
         equilibration.context.setPositions(workflow.positions)
         equilibration.context.setPeriodicBoxVectors(*workflow.psf.topology.getPeriodicBoxVectors())
         equilibration.context.setVelocities((np.array(workflow.positions)*0).tolist())
+        equilibration.reporters.append(StateDataReporter(
+            "equilibration.txt", 100, step=True, time=True,
+            potentialEnergy=True, temperature=True,
+            volume=True, density=True, speed=True)
+        )
 
         print("Starting Minimization...")
         equilibration.minimizeEnergy(minimization_tolerance, max_minimization_iterations)
