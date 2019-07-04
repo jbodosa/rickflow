@@ -6,6 +6,8 @@ import pkg_resources
 import traceback
 import numpy as np
 
+from simtk.openmm import MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat
+
 
 def abspath(relative_path): # type (object) -> object
     """Get file from a path that is relative to caller's module.
@@ -86,3 +88,12 @@ def increment_using_multiindices(array, index_array):
     unfolded_indices = np.ravel_multi_index(index_array.T, array.shape)
     np.add.at(unfolded_array, unfolded_indices, 1)
     return np.reshape(unfolded_array, array.shape)
+
+
+def get_barostat(system):
+    for i in range(system.getNumForces()):
+        force = system.getForce(i)
+        if any(isinstance(force, barostat) for
+               barostat in [MonteCarloMembraneBarostat, MonteCarloAnisotropicBarostat, MonteCarloBarostat]):
+            return force
+    return None
