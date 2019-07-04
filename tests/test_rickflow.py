@@ -151,7 +151,7 @@ def test_equilibrate(tmpdir):
             flow.positions = (np.array(flow.positions) * 0.5).tolist()
             flow.prepareSimulation(integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond))
             if do_equilibration:
-                equilibrate(flow, 300.0*u.kelvin, gpu_id=None, number_of_equilibration_steps=1000,
+                equilibrate(flow, 300.0*u.kelvin, gpu_id=None, number_of_equilibration_steps=300,
                             max_minimization_iterations=100)
                 flow.run()
             else:
