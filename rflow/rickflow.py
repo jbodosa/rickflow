@@ -413,73 +413,76 @@ class RickFlow(object):
                 fp.write(str(self.next_seqno))
 
 
-def equilibrate(workflow, target_temperature,
-                minimization_tolerance=10.000000000000004 * u.kilojoule/u.mole,
-                max_minimization_iterations=0,
-                number_of_equilibration_steps=100000,
-                start_temperature=100 * u.kelvin,
-                gpu_id=0
-                ):
-    """Energy minimization and gradual heating to get a stable starting configuration.
+    def equilibrate(self, target_temperature,
+                    minimize=True,
+                    minimization_tolerance=10.000000000000004 * u.kilojoule/u.mole,
+                    max_minimization_iterations=0,
+                    number_of_equilibration_steps=100000,
+                    start_temperature=100 * u.kelvin,
+                    gpu_id=0
+                    ):
+        """Energy minimization and gradual heating to get a stable starting configuration.
 
-    Args:
-        workflow: A RickFlow instance that has been prepared for simulation using RickFlow.prepareSimulation.
-        target_temperature:
-        minimization_tolerance:
-        max_minimization_iterations:
-        number_of_equilibration_steps:
-        start_temperature:
-        gpu_id:
+        Args:
+            target_temperature:
+            minimize (bool): Whether to perform a minimization
+            minimization_tolerance:
+            max_minimization_iterations:
+            number_of_equilibration_steps:
+            start_temperature:
+            gpu_id:
 
-    Returns:
+        Returns:
 
-    """
-    if workflow.simulation is None:
-        raise RickFlowException("equilibrate can only be called after preparing the simulation "
-                                "(RickFlow.prepareSimulation)")
-    barostat = get_barostat(workflow.system)
-    number_of_equilibration_steps //= 2  # two equilibration phases
+        """
+        if self.simulation is None:
+            raise RickFlowException("equilibrate can only be called after preparing the simulation "
+                                    "(RickFlow.prepareSimulation)")
+        barostat = get_barostat(self.system)
+        number_of_equilibration_steps //= 2  # two equilibration phases
 
-    with CWD(workflow.work_dir):
-        # set up simulation
-        integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond, 1.0 * u.femtosecond)
-        if gpu_id is not None:
-            platform, platform_properties = require_cuda(gpu_id=gpu_id)
-        else:
-            platform = None
-            platform_properties = None
-        equilibration = Simulation(workflow.psf.topology, workflow.system, integrator, platform, platform_properties)
-        equilibration.context.setPositions(workflow.positions)
-        equilibration.context.setPeriodicBoxVectors(*workflow.psf.topology.getPeriodicBoxVectors())
-        equilibration.context.setVelocities((np.array(workflow.positions)*0).tolist())
-        equilibration.reporters.append(StateDataReporter(
-            "equilibration.txt", 100, step=True, time=True,
-            potentialEnergy=True, temperature=True,
-            volume=True, density=True, speed=True)
-        )
+        with CWD(self.work_dir):
+            # set up simulation
+            integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond, 1.0 * u.femtosecond)
+            if gpu_id is not None:
+                platform, platform_properties = require_cuda(gpu_id=gpu_id)
+            else:
+                platform = None
+                platform_properties = None
+            equilibration = Simulation(self.psf.topology, self.system, integrator, platform, platform_properties)
+            #self.context.getState(getP)
+            equilibration.context.setPositions(self.positions)
+            equilibration.context.setPeriodicBoxVectors(*self.psf.topology.getPeriodicBoxVectors())
+            equilibration.context.setVelocities((np.array(self.positions)*0).tolist())
+            equilibration.reporters.append(StateDataReporter(
+                "equilibration.txt", 100, step=True, time=True,
+                potentialEnergy=True, temperature=True,
+                volume=True, density=True, speed=True)
+            )
 
-        print("Starting Minimization...")
-        equilibration.minimizeEnergy(minimization_tolerance, max_minimization_iterations)
-        print("Minimization done.")
+            if minimize:
+                print("Starting Minimization...")
+                equilibration.minimizeEnergy(minimization_tolerance, max_minimization_iterations)
+                print("Minimization done.")
 
-        print("Starting heating ({} steps)...".format(number_of_equilibration_steps))
-        for i in range(number_of_equilibration_steps//100):
-            switch = (i*100)/number_of_equilibration_steps
-            temperature = (1-switch) * start_temperature + switch * target_temperature
-            integrator.setTemperature(temperature)
-            # apply temperature to barostat
+            print("Starting heating ({} steps)...".format(number_of_equilibration_steps))
+            for i in range(number_of_equilibration_steps//100):
+                switch = (i*100)/number_of_equilibration_steps
+                temperature = (1-switch) * start_temperature + switch * target_temperature
+                integrator.setTemperature(temperature)
+                # apply temperature to barostat
+                if barostat is not None:
+                    equilibration.context.setParameter(barostat.Temperature(), temperature)
+                equilibration.step(100)
+
+            print("...Running {} steps at target temperature...".format(number_of_equilibration_steps))
+            integrator.setTemperature(target_temperature)
             if barostat is not None:
-                equilibration.context.setParameter(barostat.Temperature(), temperature)
-            equilibration.step(100)
+                equilibration.context.setParameter(barostat.Temperature(), target_temperature)
+            equilibration.step(number_of_equilibration_steps)
+            print("Equilibration done.")
 
-        print("...Running {} steps at target temperature...".format(number_of_equilibration_steps))
-        integrator.setTemperature(target_temperature)
-        if barostat is not None:
-            equilibration.context.setParameter(barostat.Temperature(), target_temperature)
-        equilibration.step(number_of_equilibration_steps)
-        print("Equilibration done.")
-
-        equilibration.saveState("equilibrated.xml")
-        workflow.simulation.loadState("equilibrated.xml")
+            equilibration.saveState("equilibrated.xml")
+            self.simulation.loadState("equilibrated.xml")
 
 
