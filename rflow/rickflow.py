@@ -13,6 +13,7 @@ import random
 import simtk.unit as u
 from simtk.openmm import Platform
 from simtk.openmm import CustomNonbondedForce, NonbondedForce, LangevinIntegrator
+from simtk.openmm import DrudeForce
 from simtk.openmm.app import Simulation
 from simtk.openmm.app import CharmmPsfFile, CharmmParameterSet, CharmmCrdFile
 from simtk.openmm.app import PME, HBonds
@@ -21,7 +22,7 @@ from simtk.openmm.app import DCDFile, StateDataReporter, PDBReporter
 import mdtraj as md
 
 from rflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
-from rflow.utility import CWD, get_barostat
+from rflow.utility import CWD, get_barostat, get_force
 from rflow import omm_vfswitch, select_atoms
 
 
@@ -440,10 +441,16 @@ class RickFlow(object):
                                     "(RickFlow.prepareSimulation)")
         barostat = get_barostat(self.system)
         number_of_equilibration_steps //= 2  # two equilibration phases
+        isdrude = get_force(self.system, [DrudeForce]) is not None
 
         with CWD(self.work_dir):
             # set up simulation
-            integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond, 1.0 * u.femtosecond)
+            if isdrude:
+                integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond,
+                                                1.0 * u.kelvin, 20.0 / u.picosecond,
+                                                1.0 * u.femtosecond)
+            else:
+                integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond, 1.0 * u.femtosecond)
             if gpu_id is not None:
                 platform, platform_properties = require_cuda(gpu_id=gpu_id)
             else:

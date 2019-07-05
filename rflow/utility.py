@@ -8,6 +8,7 @@ import numpy as np
 
 from simtk.openmm import MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat
 
+from rflow.exceptions import RickFlowException
 
 def abspath(relative_path): # type (object) -> object
     """Get file from a path that is relative to caller's module.
@@ -91,9 +92,16 @@ def increment_using_multiindices(array, index_array):
 
 
 def get_barostat(system):
+    return get_force(system, [MonteCarloMembraneBarostat, MonteCarloAnisotropicBarostat, MonteCarloBarostat])
+
+
+def get_force(system, forcetypes):
+    result = None
     for i in range(system.getNumForces()):
         force = system.getForce(i)
-        if any(isinstance(force, barostat) for
-               barostat in [MonteCarloMembraneBarostat, MonteCarloAnisotropicBarostat, MonteCarloBarostat]):
-            return force
-    return None
+        if any(isinstance(force, forcetype) for forcetype in forcetypes):
+            if result is None:
+                result = (i, force)
+            else:
+                raise RickFlowException("Multiple forces found get_force.")
+    return result
