@@ -13,7 +13,7 @@ import random
 import simtk.unit as u
 from simtk.openmm import Platform
 from simtk.openmm import CustomNonbondedForce, NonbondedForce, LangevinIntegrator
-from simtk.openmm import DrudeForce
+from simtk.openmm import DrudeForce, DrudeLangevinIntegrator
 from simtk.openmm.app import Simulation
 from simtk.openmm.app import CharmmPsfFile, CharmmParameterSet, CharmmCrdFile
 from simtk.openmm.app import PME, HBonds
@@ -446,7 +446,8 @@ class RickFlow(object):
         with CWD(self.work_dir):
             # set up simulation
             if isdrude:
-                integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond,
+                print("Found Drude Force.")
+                integrator = DrudeLangevinIntegrator(start_temperature, 5.0 / u.picosecond,
                                                 1.0 * u.kelvin, 20.0 / u.picosecond,
                                                 1.0 * u.femtosecond)
             else:
