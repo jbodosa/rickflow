@@ -105,6 +105,14 @@ def test_cos_openmm_force(force_type, constant_height):
         system.addForce(series.as_openmm_cv_forces(particle_id_list=[[0]], system=system)[0])
     elif force_type == "centroid":
         system.addForce(series.as_openmm_centroid_force(particle_id_list=[[0]]))
+        try:
+            Context(system, LangevinIntegrator(
+                500.0, 1. / u.picosecond, 1.0 * u.femtosecond), platform)
+        except Exception as e:
+            if "Unknown variable 'h22'" in str(e):
+                pytest.skip("This version of OpenMM does not support h22 in CustomCentroidBondForce.")
+            else:
+                raise e
     else:
         system.addForce(series.as_openmm_force(particle_ids=[0]))
     context = Context(system, LangevinIntegrator(
@@ -189,10 +197,16 @@ def test_centroid_force():
     system.addForce(force)
 
     integrator = VerletIntegrator(1.0 * u.femtosecond)
-    context = Context(system, integrator, platform)
-    context.setPeriodicBoxVectors(*np.eye(3) * 4.0 * u.nanometer)
-    context.setPositions([[0.0, 0.0, float(i)] for i in range(4)])
+    try:
+        context = Context(system, integrator, platform)
+        context.setPeriodicBoxVectors(*np.eye(3) * 4.0 * u.nanometer)
+        context.setPositions([[0.0, 0.0, float(i)] for i in range(4)])
 
-    ener = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
-        u.kilojoule_per_mole)
-    print(ener)
+        ener = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+            u.kilojoule_per_mole)
+        print(ener)
+    except Exception as e:
+        if "Unknown variable 'h22'" in str(e):
+            pytest.skip("This version of OpenMM does not support h22 in CustomCentroidBondForce.")
+        else:
+            raise e
