@@ -156,5 +156,5 @@ def test_equilibrate(tmpdir):
                 flow.run()
             else:
                 ## check that the simulation would fail without equilibration
-                with pytest.raises(Exception):
+                with pytest.raises(Exception): # could be a ValueError or an OpenMMException
                     flow.run()
