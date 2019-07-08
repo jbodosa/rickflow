@@ -8,7 +8,7 @@ Andreas Kraemer, 2018.
 
 import numpy as np
 import simtk.unit as u
-from simtk.openmm.openmm import CustomExternalForce, CustomCVForce
+from simtk.openmm.openmm import CustomExternalForce, CustomCVForce, CustomCentroidBondForce
 from simtk.openmm.openmm import System, TwoParticleAverageSite, NonbondedForce
 from simtk.openmm.app import Element
 from rflow.utility import select_atoms
@@ -165,6 +165,30 @@ class FreeEnergyCosineSeries(object):
 
             forces.append(biasing_force)
         return forces
+
+    def as_openmm_centroid_force(self, particle_id_list):
+        energy_strings = []
+        for res_nr, molecule in enumerate(particle_id_list):
+            energy_strings += [str(self).replace("z", "z{}".format(res_nr+1))]
+        energy_string = " + ".join("({})".format(es) for es in energy_strings)
+        biasing_force = CustomCentroidBondForce(1, energy_string)
+        for molecule in particle_id_list:
+            i = biasing_force.addGroup(molecule)
+            biasing_force.addBond([i])
+        biasing_force.addGlobalParameter("PI", np.pi)
+        biasing_force.addGlobalParameter("LZ", self.averageBoxHeight)
+        for i in range(len(self.coefficients)):
+            biasing_force.addGlobalParameter("A{}".format(i), self.coefficients[i])
+        biasing_force.setUsesPeriodicBoundaryConditions(False)
+
+        print(biasing_force.getNumGlobalParameters())
+        for i in range(biasing_force.getNumGlobalParameters()):
+            print(biasing_force.getGlobalParameterName(i), biasing_force.getGlobalParameterDefaultValue(i))
+        print(biasing_force.getNumGroups())
+        for i in range(biasing_force.getNumGroups()):
+            print(biasing_force.getGroupParameters(i))
+        print(biasing_force)
+        return biasing_force
 
     def as_openmm_vsite_force(self, particle_id_pairs, system, topology,
                               positions, weights=[0.5, 0.5]):

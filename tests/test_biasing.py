@@ -13,7 +13,7 @@ import os
 import random
 import numpy as np
 
-from simtk.openmm import System, Context, LangevinIntegrator, VerletIntegrator
+from simtk.openmm import System, Context, LangevinIntegrator, VerletIntegrator, Platform
 from simtk.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
 from simtk import unit as u
 
@@ -82,13 +82,15 @@ def test_cos_series_with_quantities():
             == approx(4.184))
 
 
-@pytest.mark.parametrize("use_com_cv", [True, False])
+@pytest.mark.parametrize("force_type", ["standard", "cv", "centroid"])
 @pytest.mark.parametrize("constant_height", [True, False])
-def test_cos_openmm_force(use_com_cv, constant_height):
+def test_cos_openmm_force(force_type, constant_height):
     """
     Tests if the forces applied by openmm are consistent with the ones
     that are output by the call function.
     """
+    platform = Platform.getPlatformByName("Reference")
+
     series = FreeEnergyCosineSeries(
         average_box_height=10.0 * u.angstrom,
         coefficients=u.Quantity(value=np.array([1.0, 1.0]), unit=u.kilojoule_per_mole),
@@ -99,12 +101,14 @@ def test_cos_openmm_force(use_com_cv, constant_height):
     system = System()
     system.addParticle(1.0)
     system.getNumParticles()
-    if use_com_cv:
+    if force_type == "cv":
         system.addForce(series.as_openmm_cv_forces(particle_id_list=[[0]], system=system)[0])
+    elif force_type == "centroid":
+        system.addForce(series.as_openmm_centroid_force(particle_id_list=[[0]]))
     else:
         system.addForce(series.as_openmm_force(particle_ids=[0]))
     context = Context(system, LangevinIntegrator(
-        500.0, 1./u.picosecond, 1.0* u.femtosecond))
+        500.0, 1./u.picosecond, 1.0* u.femtosecond), platform)
     context.setPeriodicBoxVectors(*np.eye(3)*10.0*u.angstrom)
 
     for z in np.arange(0,10.0, 0.1):
@@ -170,3 +174,24 @@ def test_constant_pull_periodic():
         analytic_solution = (0.5*force/mass*t**2).value_in_unit(u.nanometer)
         assert z == pytest.approx(analytic_solution, abs=0.01)
 
+
+def test_centroid_force():
+    platform = Platform.getPlatformByName("Reference")
+    system = System()
+    for i in range(4):
+        system.addParticle(1.0)
+    from simtk.openmm import CustomCentroidBondForce
+    force = CustomCentroidBondForce(1, "2+periodicdistance(z1,z1)")# + k * distance(g1,g2)")
+    force.addGroup([0])
+    #force.addPerBondParameter("k")
+    force.addBond([0])
+    system.addForce(force)
+
+    integrator = VerletIntegrator(1.0 * u.femtosecond)
+    context = Context(system, integrator, platform)
+    context.setPeriodicBoxVectors(*np.eye(3) * 4.0 * u.nanometer)
+    context.setPositions([[0.0, 0.0, float(i)] for i in range(4)])
+
+    ener = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
+        u.kilojoule_per_mole)
+    print(ener)
