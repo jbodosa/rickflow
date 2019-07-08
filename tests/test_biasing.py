@@ -92,7 +92,7 @@ def test_cos_openmm_force(force_type, constant_height):
     platform = Platform.getPlatformByName("Reference")
 
     series = FreeEnergyCosineSeries(
-        average_box_height=10.0 * u.angstrom,
+        average_box_height=20.0 * u.angstrom,
         coefficients=u.Quantity(value=np.array([1.0, 1.0]), unit=u.kilojoule_per_mole),
         constant_height=constant_height
     )
@@ -109,7 +109,7 @@ def test_cos_openmm_force(force_type, constant_height):
         system.addForce(series.as_openmm_force(particle_ids=[0]))
     context = Context(system, LangevinIntegrator(
         500.0, 1./u.picosecond, 1.0* u.femtosecond), platform)
-    context.setPeriodicBoxVectors(*np.eye(3)*10.0*u.angstrom)
+    context.setPeriodicBoxVectors(*np.eye(3)*20*u.angstrom)
 
     for z in np.arange(0,10.0, 0.1):
         context.setPositions(u.Quantity(value=np.array([[0.0, 0.0, z]]),
@@ -181,7 +181,8 @@ def test_centroid_force():
     for i in range(4):
         system.addParticle(1.0)
     from simtk.openmm import CustomCentroidBondForce
-    force = CustomCentroidBondForce(1, "2+periodicdistance(z1,z1)")# + k * distance(g1,g2)")
+    force = CustomCentroidBondForce(1, "z1 + h22")# + k * distance(g1,g2)")
+    force.setUsesPeriodicBoundaryConditions(True)
     force.addGroup([0])
     #force.addPerBondParameter("k")
     force.addBond([0])

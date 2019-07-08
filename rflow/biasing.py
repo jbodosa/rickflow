@@ -82,15 +82,18 @@ class FreeEnergyCosineSeries(object):
             string: A string that is interpretable by OpenMM.
 
         """
-        if self.constantHeight:
-            L_str = "LZ"
-        else:
-            L_str = "(0.75*LZ + periodicdistance(0,0,0,0,0,0.75*LZ))"
         result = " + ".join(
-            "A{} * cos( ( z / {} ) * 2 * PI * {} )".format(i, L_str, i)
+            "A{} * cos( ( z / boxheight ) * 2 * PI * {} )".format(i, i)
             for i in range(len(self.coefficients))
         )
         return result
+
+    @property
+    def BOXHEIGHT_STRING(self):
+        if self.constantHeight:
+            return "boxheight=LZ"
+        else:
+            return "boxheight=(0.75*LZ + periodicdistance(0,0,0,0,0,0.75*LZ))"
 
     def __call__(self, z, box_height=None):
         """
@@ -123,7 +126,7 @@ class FreeEnergyCosineSeries(object):
         Returns:
             A CustomExternalForce object: The cosine series as an OpenMM force.
         """
-        biasing_force = CustomExternalForce(str(self))
+        biasing_force = CustomExternalForce(str(self) + ';' + self.BOXHEIGHT_STRING + ';')
         biasing_force.addGlobalParameter("PI", np.pi)
         biasing_force.addGlobalParameter("LZ", self.averageBoxHeight)
         for i in range(len(self.coefficients)):
@@ -131,6 +134,7 @@ class FreeEnergyCosineSeries(object):
                                              self.coefficients[i])
         for particle in particle_ids:
             biasing_force.addParticle(particle)
+
         return biasing_force
 
     def as_openmm_cv_forces(self, particle_id_list, system):
@@ -167,27 +171,15 @@ class FreeEnergyCosineSeries(object):
         return forces
 
     def as_openmm_centroid_force(self, particle_id_list):
-        energy_strings = []
-        for res_nr, molecule in enumerate(particle_id_list):
-            energy_strings += [str(self).replace("z", "z{}".format(res_nr+1))]
-        energy_string = " + ".join("({})".format(es) for es in energy_strings)
+        energy_string = str(self).replace("z","z1") + ";boxheight=h22;"
         biasing_force = CustomCentroidBondForce(1, energy_string)
+        biasing_force.setUsesPeriodicBoundaryConditions(True)
         for molecule in particle_id_list:
             i = biasing_force.addGroup(molecule)
             biasing_force.addBond([i])
         biasing_force.addGlobalParameter("PI", np.pi)
-        biasing_force.addGlobalParameter("LZ", self.averageBoxHeight)
         for i in range(len(self.coefficients)):
             biasing_force.addGlobalParameter("A{}".format(i), self.coefficients[i])
-        biasing_force.setUsesPeriodicBoundaryConditions(False)
-
-        print(biasing_force.getNumGlobalParameters())
-        for i in range(biasing_force.getNumGlobalParameters()):
-            print(biasing_force.getGlobalParameterName(i), biasing_force.getGlobalParameterDefaultValue(i))
-        print(biasing_force.getNumGroups())
-        for i in range(biasing_force.getNumGroups()):
-            print(biasing_force.getGroupParameters(i))
-        print(biasing_force)
         return biasing_force
 
     def as_openmm_vsite_force(self, particle_id_pairs, system, topology,
