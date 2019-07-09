@@ -200,14 +200,14 @@ class Distribution(BinEdgeUpdater):
 
 
 class EnergyDecomposition(object):
-    """Calculate different potential energy terms for a trajectory
+    """Calculate different potential energy terms from a trajectory
     """
     def __init__(self, system):
         self.system = system
         dummy_integrator = LangevinIntegrator(1., 1., 1.)
         self.context = Context(system, dummy_integrator)
 
-    def getForceGroup(self, forces):
+    def assign_force_groups(self, forces):
         self.forcegroups = {}
         for i in range(self.system.getNumForces()):
             force = self.system.getForce(i)
@@ -240,15 +240,9 @@ class EnergyDecomposition(object):
         - n_frames (kwargs): int, only the first n frames of the trajectory
         are used to calculate energies if this is provided
         """
-        if "n_frames" not in kwargs:
-            n_frames = traj.n_frames
-        else:
-            n_frames = kwargs["n_frames"]
-        if "forces_to_return" not in kwargs:
-            forces_to_return = "all"
-        else:
-            forces_to_return = kwargs["forces_to_return"]
-        self.getForceGroup(forces_to_return)
+        n_frames = kwargs.get("n_frames", traj.n_frames)
+        forces_to_return = kwargs.get("forces_to_return", "all")
+        self.assign_force_groups(forces_to_return)
         self.context.reinitialize(preserveState=True)
         energies = {}
         for f, i in self.forcegroups.items():
