@@ -201,8 +201,7 @@ def test_centroid_force():
     force.addGroup([0])
     #force.addPerBondParameter("k")
     force.addBond([0])
-    system.addForce(force)
-
+    add_centroid_force(system, force, platform)
     integrator = VerletIntegrator(1.0 * u.femtosecond)
     try:
         context = Context(system, integrator, platform)
