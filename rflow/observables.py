@@ -224,7 +224,6 @@ class EnergyDecomposition(object):
 
     def energyDecomposition(self, energies):
         for f, i in self.forcegroups.items():
-            print(f, i)
             energies[f].append(
                 self.context.getState(
                     getEnergy=True, groups={i} #2**i
