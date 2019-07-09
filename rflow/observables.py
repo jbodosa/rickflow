@@ -5,6 +5,11 @@ Tools for analyzing MD observables
 import os
 import pickle
 import numpy as np
+
+from simtk.openmm import Context, LangevinIntegrator, NonbondedForce
+from mdtraj.utils import lengths_and_angles_to_box_vectors
+import simtk.unit as u
+
 from rflow.trajectory import normalize
 from rflow.utility import select_atoms
 
@@ -192,3 +197,77 @@ class Distribution(BinEdgeUpdater):
     def load_from_pic(filename):
         with open(filename, 'rb') as pic:
             return pickle.load(pic)
+
+
+class EnergyDecomposition(object):
+    """Calculate different potential energy terms for a trajectory
+    """
+    def __init__(self, system):
+        self.system = system
+        dummy_integrator = LangevinIntegrator(1., 1., 1.)
+        self.context = Context(system, dummy_integrator)
+
+    def getForceGroup(self, forces):
+        self.forcegroups = {}
+        for i in range(self.system.getNumForces()):
+            force = self.system.getForce(i)
+            force.setForceGroup(i)
+            # make the force object to str and human readable
+            f = str(force).split("::")[1].split("*")[0].strip()
+            if f in forces or forces == "all":
+                self.forcegroups[f] = i
+        for i in range(self.system.getNumForces()):
+            force = self.system.getForce(i)
+            if isinstance(force, NonbondedForce):
+                force.setReciprocalSpaceForceGroup(self.system.getNumForces())
+                self.forcegroups["Reciprocal"] = self.system.getNumForces()
+
+    def energyDecomposition(self, energies):
+        for f, i in self.forcegroups.items():
+            print(f, i)
+            energies[f].append(
+                self.context.getState(
+                    getEnergy=True, groups={i} #2**i
+                ).getPotentialEnergy().value_in_unit(u.kilocalories_per_mole)
+            )
+        print("done")
+
+    def __call__(self, traj, **kwargs):
+        """
+        Args:
+        - traj: the trajectory to get energies from
+        - force_to_return (kwargs):
+        HarmonicBondForce, HarmonicAngleForce, PeriodicTorsionForce, CustomTorsionForce,
+        CMAPTorsionForce, NonbondedForce, CMMotionRemover, and MORE TO COME ...
+        - n_frames (kwargs): int, only the first n frames of the trajectory
+        are used to calculate energies if this is provided
+        """
+        if "n_frames" not in kwargs:
+            n_frames = traj.n_frames
+        else:
+            n_frames = kwargs["n_frames"]
+        if "forces_to_return" not in kwargs:
+            forces_to_return = "all"
+        else:
+            forces_to_return = kwargs["forces_to_return"]
+        self.getForceGroup(forces_to_return)
+        self.context.reinitialize(preserveState=True)
+        energies = {}
+        for f, i in self.forcegroups.items():
+            # Initialize energy dictionary
+            energies[f] = []
+        for frame in range(n_frames):
+            box_vectors = lengths_and_angles_to_box_vectors(
+                *traj.unitcell_lengths[frame], *traj.unitcell_angles[frame]
+            )
+            self.context.setPeriodicBoxVectors(*box_vectors)
+            self.context.setPositions(traj.xyz[frame])
+            self.energyDecomposition(energies)
+        energy_list = []
+        for f, e in energies.items():
+            energy_list.append(e)
+        energy_array = np.swapaxes(np.array(energy_list), 0, 1)
+        if energy_array.shape[1] == 1:
+            return np.reshape(energy_array, -1)
+        else:
+            return energy_array

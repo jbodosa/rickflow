@@ -17,9 +17,6 @@ from simtk import unit as u
 from simtk.openmm import LangevinIntegrator
 
 
-pytestmark = pytest.mark.filterwarnings("ignore:Detected PSF molecule section that is WRONG")
-
-
 @pytest.fixture(scope="module")
 def rickflow_instance(tmpdir_factory):
     return RickFlow(

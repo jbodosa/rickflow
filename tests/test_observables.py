@@ -4,9 +4,16 @@
 
 import os
 import warnings
+import glob
 import numpy as np
 from pytest import approx
 from rflow.observables import *
+from simtk.openmm.app import PME, HBonds
+import simtk.unit as u
+from rflow import RickFlow, TrajectoryIterator
+from rflow import abspath
+
+import mdtraj as md
 
 
 def test_statistical_quantity():
@@ -128,3 +135,33 @@ def test_distribution_add(whex_iterator):
     sum_dist = sum([dist, dist2, dist3])
     assert sum_dist.average_box_size == (dist.average_box_size + dist2.average_box_size + dist3.average_box_size)/3
     assert (sum_dist.counts == dist.counts + dist2.counts + dist3.counts).all()
+
+
+def test_energy_decomposition(tmpdir):
+    # run short simulation
+    flow = RickFlow(
+        toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
+        psf=abspath("data/water.psf"),
+        crd=abspath("data/water.crd"),
+        box_dimensions=[25.1984] * 3,
+        gpu_id=None,
+        steps_per_sequence=10,
+        table_output_interval=1,
+        dcd_output_interval=1,
+        recenter_coordinates=False,
+        work_dir=str(tmpdir)
+    )
+    flow.prepareSimulation(LangevinIntegrator(300.0 * u.kelvin, 1/u.picosecond, 1*u.femtosecond))
+    flow.run()
+
+    # extract energies
+    trajectory = md.load_dcd(os.path.join(flow.work_dir, "trj/dyn1.dcd"), top=abspath("data/water.psf"))
+    evaluate_energy = EnergyDecomposition(flow.system)
+    energies = evaluate_energy(trajectory, n_frames=10, forces_to_return='all')
+    recalculated = energies.sum(axis=1)
+    from_simulation = (np.loadtxt(os.path.join(flow.work_dir, "out/out1.txt"), delimiter=',')[:,2]
+        * u.kilojoule_per_mole / u.kilocalories_per_mole
+    )
+
+    assert recalculated == approx(from_simulation)
+
