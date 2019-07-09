@@ -17,6 +17,17 @@ from simtk.openmm import System, Context, LangevinIntegrator, VerletIntegrator, 
 from simtk.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
 from simtk import unit as u
 
+def add_centroid_force(system, custom_centroid_bond_force, platform):
+    """A wrapper function to acknowledge that the h22 magic variable is not standard OpenMM right now"""
+    system.addForce(custom_centroid_bond_force)
+    try:
+        Context(system, LangevinIntegrator(
+            500.0, 1. / u.picosecond, 1.0 * u.femtosecond), platform)
+    except Exception as e:
+        if "Unknown variable 'h22'" in str(e):
+            pytest.skip("This version of OpenMM does not support h22 in CustomCentroidBondForce.")
+        else:
+            raise e
 
 class OpenMMEnergyEvaluator(object):
     """
@@ -90,7 +101,6 @@ def test_cos_openmm_force(force_type, constant_height):
     that are output by the call function.
     """
     platform = Platform.getPlatformByName("Reference")
-
     series = FreeEnergyCosineSeries(
         average_box_height=20.0 * u.angstrom,
         coefficients=u.Quantity(value=np.array([1.0, 1.0]), unit=u.kilojoule_per_mole),
@@ -104,15 +114,7 @@ def test_cos_openmm_force(force_type, constant_height):
     if force_type == "cv":
         system.addForce(series.as_openmm_cv_forces(particle_id_list=[[0]], system=system)[0])
     elif force_type == "centroid":
-        system.addForce(series.as_openmm_centroid_force(particle_id_list=[[0]]))
-        try:
-            Context(system, LangevinIntegrator(
-                500.0, 1. / u.picosecond, 1.0 * u.femtosecond), platform)
-        except Exception as e:
-            if "Unknown variable 'h22'" in str(e):
-                pytest.skip("This version of OpenMM does not support h22 in CustomCentroidBondForce.")
-            else:
-                raise e
+        add_centroid_force(system, series.as_openmm_centroid_force(particle_id_list=[[0]]), platform)
     else:
         system.addForce(series.as_openmm_force(particle_ids=[0]))
     context = Context(system, LangevinIntegrator(
@@ -131,8 +133,10 @@ def test_cos_openmm_force(force_type, constant_height):
         assert target == approx(energy, abs=1e-5)
 
 
-def test_partial_com_restraint():
+@pytest.mark.parametrize("force_type", ["cv", "centroid"])
+def test_partial_com_restraint(force_type):
     # minimal system with one particle
+    platform = Platform.getPlatformByName("Reference")
     system = System()
     system.addParticle(1.0)
     system.getNumParticles()
@@ -144,7 +148,10 @@ def test_partial_com_restraint():
                                         position=0.7,
                                         box_height_guess=box_length*1.2 # an inaccurate guess is OK
                                         )
-    system.addForce(bias.as_openmm_force(system))
+    if force_type == "cv":
+        system.addForce(bias.as_openmm_cv_force(system))
+    elif force_type == "centroid":
+        add_centroid_force(system, bias.as_openmm_centroid_force(), platform)
     context = Context(system, LangevinIntegrator(
         500.0, 1. / u.picosecond, 1.0 * u.femtosecond))
     context.setPeriodicBoxVectors(*np.eye(3)*box_length)

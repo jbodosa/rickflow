@@ -6,6 +6,7 @@ This module contains functionality to facilitate biased simulations in OpenMM.
 Andreas Kraemer, 2018.
 """
 
+import warnings
 import numpy as np
 import simtk.unit as u
 from simtk.openmm.openmm import CustomExternalForce, CustomCVForce, CustomCentroidBondForce
@@ -286,6 +287,13 @@ class RelativePartialCenterOfMassRestraint(object):
         self.box_height = box_height_guess
 
     def as_openmm_force(self, system):
+        warnings.warn(
+            "RelativePartialCenterOfMassRestraint.as_openmm_force has been renamed "
+            "to RelativePartialCenterOfMassRestraint.as_openmm_cv_force", DeprecationWarning
+        )
+        return self.as_openmm_cv_force(system)
+
+    def as_openmm_cv_force(self, system):
         """
         Args:
             system: The OpenMM system.
@@ -300,6 +308,15 @@ class RelativePartialCenterOfMassRestraint(object):
         biasing_force.addGlobalParameter("zref", self.position)
         biasing_force.addGlobalParameter("k0", self.force_constant)
         return biasing_force
+
+    def as_openmm_centroid_force(self):
+        biasing_force = CustomCentroidBondForce(1, self.energy_string.replace("zcom", "(z1/h22)"))
+        groupid = biasing_force.addGroup(self.atom_ids)
+        biasing_force.addBond([groupid])
+        biasing_force.addGlobalParameter("zref", self.position)
+        biasing_force.addGlobalParameter("k0", self.force_constant)
+        return biasing_force
+
 
     def __str__(self):
         string = "{}; k0 = {}, zref={}".format(
