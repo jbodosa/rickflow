@@ -5,6 +5,7 @@ Tools for analyzing MD observables
 import os
 import pickle
 import numpy as np
+import pandas as pd
 
 from simtk.openmm import Context, LangevinIntegrator, NonbondedForce
 from mdtraj.utils import lengths_and_angles_to_box_vectors
@@ -206,29 +207,32 @@ class EnergyDecomposition(object):
         self.system = system
         dummy_integrator = LangevinIntegrator(1., 1., 1.)
         self.context = Context(system, dummy_integrator)
+        self.forcegroups = []
 
     def assign_force_groups(self, forces):
-        self.forcegroups = {}
+        self.forcegroups.clear()
         for i in range(self.system.getNumForces()):
             force = self.system.getForce(i)
             force.setForceGroup(i)
             # make the force object to str and human readable
-            f = str(force).split("::")[1].split("*")[0].strip()
-            if f in forces or forces == "all":
-                self.forcegroups[f] = i
+            forcename = str(force).split("::")[1].split("*")[0].strip()
+            if forcename in forces or forces == "all":
+                self.forcegroups.append(forcename)
         for i in range(self.system.getNumForces()):
             force = self.system.getForce(i)
             if isinstance(force, NonbondedForce):
                 force.setReciprocalSpaceForceGroup(self.system.getNumForces())
-                self.forcegroups["Reciprocal"] = self.system.getNumForces()
+                self.forcegroups.append("Reciprocal")
 
-    def energyDecomposition(self, energies):
-        for f, i in self.forcegroups.items():
-            energies[f].append(
+    def calculate_energies_from_context(self):
+        energies = []
+        for i in range(len(self.forcegroups)):
+            energies.append(
                 self.context.getState(
-                    getEnergy=True, groups={i} #2**i
+                    getEnergy=True, groups={i}
                 ).getPotentialEnergy().value_in_unit(u.kilocalories_per_mole)
             )
+        return energies
 
     def __call__(self, traj, **kwargs):
         """
@@ -244,22 +248,23 @@ class EnergyDecomposition(object):
         forces_to_return = kwargs.get("forces_to_return", "all")
         self.assign_force_groups(forces_to_return)
         self.context.reinitialize(preserveState=True)
-        energies = {}
-        for f, i in self.forcegroups.items():
-            # Initialize energy dictionary
-            energies[f] = []
+        energy_terms = []
         for frame in range(n_frames):
             box_vectors = lengths_and_angles_to_box_vectors(
                 *traj.unitcell_lengths[frame], *traj.unitcell_angles[frame]
             )
             self.context.setPeriodicBoxVectors(*box_vectors)
             self.context.setPositions(traj.xyz[frame])
-            self.energyDecomposition(energies)
-        energy_list = []
-        for f, e in energies.items():
-            energy_list.append(e)
-        energy_array = np.swapaxes(np.array(energy_list), 0, 1)
-        if energy_array.shape[1] == 1:
-            return np.reshape(energy_array, -1)
-        else:
-            return energy_array
+            energy_terms.append(self.calculate_energies_from_context())
+        return np.array(energy_terms)
+
+    def as_data_frame(self, energies, **kwargs):
+        forcegroups = kwargs.get("forcegroups", self.forcegroups)
+        # delete zero columns
+        nonzero_energies = []
+        nonzero_forcegroups = []
+        for i in range(energies.shape[1]):
+            if np.any(np.abs(energies[:,i]) > 1e-5):
+                nonzero_energies.append(energies[:,i])
+                nonzero_forcegroups.append(forcegroups[i])
+        return pd.DataFrame(np.transpose(nonzero_energies), columns=nonzero_forcegroups)

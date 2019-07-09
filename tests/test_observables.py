@@ -156,12 +156,12 @@ def test_energy_decomposition(tmpdir):
 
     # extract energies
     trajectory = md.load_dcd(os.path.join(flow.work_dir, "trj/dyn1.dcd"), top=abspath("data/water.psf"))
-    evaluate_energy = EnergyDecomposition(flow.system)
-    energies = evaluate_energy(trajectory, n_frames=10, forces_to_return='all')
+    energy_evaluator = EnergyDecomposition(flow.system)
+    energies = energy_evaluator(trajectory, n_frames=10, forces_to_return='all')
     recalculated = energies.sum(axis=1)
     from_simulation = (np.loadtxt(os.path.join(flow.work_dir, "out/out1.txt"), delimiter=',')[:,2]
         * u.kilojoule_per_mole / u.kilocalories_per_mole
     )
-
-    assert recalculated == approx(from_simulation)
+    data_frame = energy_evaluator.as_data_frame(energies) # only testing the API
+    assert recalculated == approx(from_simulation, abs=0.1)
 
