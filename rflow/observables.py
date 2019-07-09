@@ -230,7 +230,6 @@ class EnergyDecomposition(object):
                     getEnergy=True, groups={i} #2**i
                 ).getPotentialEnergy().value_in_unit(u.kilocalories_per_mole)
             )
-        print("done")
 
     def __call__(self, traj, **kwargs):
         """

@@ -13,7 +13,9 @@ from rflow.exceptions import *
 from rflow.utility import increment_using_multiindices, select_atoms, CWD, abspath
 from rflow.trajectory import (TrajectoryIterator, CharmmTrajectoryIterator, make_topology, normalize,
                               center_of_mass_of_selection)
-from rflow.observables import TimeSeries, AreaPerLipid, Coordinates, BoxSize, BinEdgeUpdater, Distribution
+from rflow.observables import (TimeSeries, AreaPerLipid, Coordinates, BoxSize, BinEdgeUpdater, Distribution,
+                               EnergyDecomposition)
+
 from rflow.biasing import *
 from rflow.analyze_diffusion import TransitionCounter, PermeationEventCounter
 from rflow.biasing import *
