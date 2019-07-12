@@ -7,13 +7,16 @@ import sys
 import click
 
 import rflow
-from rflow import TrajectoryIterator, Distribution, TransitionCounter, make_topology, center_of_mass_of_selection
-import mdtraj as md
+from rflow import (TrajectoryIterator, Distribution, TransitionCounter, make_topology, center_of_mass_of_selection,
+                   ModuliInput)
 import numpy as np
+import mdtraj as md
+
 
 @click.group()
 @click.version_option(version=rflow.__version__)
-def main(args=None):
+@click.pass_context
+def main(ctx, args=None):
     """Console script for rickflow."""
     click.echo("Rickflow: a python package to facilitate running and analyzing jobs in OpenMM using CHARMM defaults.")
     return 0
@@ -74,14 +77,14 @@ def submit(batch):
 
 @main.command()
 @click.argument("selection", type=str)
-@click.option("-t", "--topology", default="system.pdb",
+@click.option("-t", "--top", default="system.pdb",
               type=click.Path(exists=True), help="Topology file (pdb or psf).")
-def select(selection, topology):
+def select(selection, top):
     """
     Check the atom ids of a selection string SELECTION
     """
-    top = make_topology(topology)
-    atom_ids = top.select(selection)
+    topology = make_topology(top)
+    atom_ids = topology.select(selection)
     print("Selection contains {} atoms.\n ids={}".format(len(atom_ids), atom_ids))
 
 
@@ -148,5 +151,82 @@ def tmat(permeant, first_seq, membrane=None,
             outdir, "com.first{}.len{}".format(first_seq, length)), com)
 
 
-if __name__ == "__main__":
-    sys.exit(main())  # pragma: no cover
+@main.group()
+@click.option("-f", "--first-seq", type=int, help="First sequence of trajectory. (default: infer)", default=None)
+@click.option("-l", "--last-seq", type=int, help="Number of sequences. (default: infer)", default=None)
+@click.option("-t", "--filename-template", help="Filenames, use {} as a wildcard for ids. (default: trj/dyn{}.dcd)",
+              default="trj/dyn{}.dcd")
+@click.option("--top", type=str, help="Topology file. (default: system.pdb)", default="system.pdb")
+@click.option("-s", "--selection", type=str, help="Operate on a subset of atoms. (default: all)", default="all")
+@click.option("--infer-time/--no-infer-time", help="Infer time from trajectory frames. (default: True)", default=True)
+@click.option("--dt", type=float, help="Time between frames in picoseconds.", default=1.0)
+@click.option("-n", "--nframes", type=int, help="Number of frames per trajectory (default: auto-detection)",
+              default=None)
+@click.option("--format", help="Trajectory format (default: infer from filename)", default=None)
+@click.pass_context
+def traj(ctx, first_seq, last_seq, filename_template, top, selection, infer_time, dt, nframes, format):
+    "Trajectory analysis module."
+    trajectories = TrajectoryIterator(
+        first_sequence=first_seq, last_sequence=last_seq, filename_template=filename_template, atom_selection=selection,
+        infer_time=infer_time, load_function=format, topology_file=top, time_between_frames=dt,
+        num_frames_per_trajectory=nframes
+    )
+    click.echo(f"Found {len(trajectories)} trajectory sequence{'s' if  len(trajectories) != 1 else ''}.")
+    ctx.obj["traj"] = trajectories
+
+
+@traj.command()
+@click.option("-h", "--head", type=str, multiple=True, help="Selection string for head atoms.")
+@click.option("-t", "--tail", type=str, multiple=True, help="Selection string for tail atoms.")
+@click.option("--whead", default=None, type=float, multiple=True, help="Weights for head atoms.")
+@click.option("--wtail", default=None, type=float, multiple=True, help="Weights for tail atoms.")
+@click.option("--bilayer_normal", type=str, default='z', help="x,y, or z")
+@click.option("-b", "--box-prefix", type=str, default="boxsize", help="Filename prefix for boxsize (default: boxsize).")
+@click.option("-l", "--lipid-prefix", type=str, default="Lipid", help="Filename prefix for coordinates (default: boxsize).")
+@click.option("--append/--no-append", default=False, help="Whether output should be appended to existing files.")
+@click.pass_context
+def moduli_input(ctx, head, tail, whead, wtail, bilayer_normal, box_prefix="boxsize", lipid_prefix="Lipid", append=False):
+    """
+    Generate input files for bilayer moduli analysis.
+
+    Example:
+    >>> rflow traj -t tests/data/ord2.dcd --top=tests/data/ord+o2.psf \
+            moduli-input "resname DPPC and name C2" \
+            -t "resname DPPC and name C216" \
+            -t "resname DPPC and name C316"
+
+    """
+    trajectories = ctx.obj["traj"]
+    head_atoms = []
+    tail_atoms = []
+    for h in head:
+        selected = trajectories.select(h)
+        if len(selected) == 0:
+            click.echo(f"Error: Selection '{h}' empty.")
+            sys.exit(1)
+        head_atoms.append(selected)
+    for t in tail:
+        selected = trajectories.select(h)
+        if len(selected) == 0:
+            click.echo(f"Error: Selection '{h}' empty.")
+            sys.exit(1)
+        tail_atoms.append(selected)
+    if len(whead) == 0: whead = None
+    if len(wtail) == 0: wtail = None
+    moduli_input = ModuliInput(
+        head_atoms=head_atoms, tail_atoms=tail_atoms, head_weights=whead, tail_weights=wtail,
+        bilayer_normal=bilayer_normal, boxsizefile_prefix=box_prefix, lipidfile_prefix=lipid_prefix,
+        append=append
+    )
+    click.echo(f"Will save results to {box_prefix}[XYZ].out and {lipid_prefix}[XYZ].out")
+    for traj in trajectories:
+        print(f"Sequence {traj.i}/{len(trajectories)}")
+        moduli_input(traj)
+
+
+
+
+
+def entrypoint():
+    sys.exit(main(obj={}))
+

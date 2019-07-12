@@ -48,7 +48,9 @@ class TrajectoryIterator(object):
                                       If None, infer the the number of frames from the first sequence that is read in.
         infer_time (bool):            Whether the time field in the trajectory should be inferred heuristically from
                                       the time between frames and number of frames per trajectory file.
-        load_function (callable):     The function used to load the files, default: md.load_dcd.
+        load_function (callable or str): The function used to load the file (e.g. md.load),
+                                      or the trajectory format as a string.
+                                      By default the format is inferred from the file suffix.
 
 
     For trajectory files that were created using the rickflow workflow, the class
@@ -76,22 +78,28 @@ class TrajectoryIterator(object):
     def __init__(self, first_sequence=None, last_sequence=None,
                  filename_template="trj/dyn{}.dcd", topology_file="system.pdb",
                  atom_selection="all", time_between_frames=1.0, num_frames_per_trajectory=None,
-                 infer_time=True, load_function=md.load_dcd):
+                 infer_time=True, load_function=md.load):
 
         # select sequences
-        trajectory_files = glob.glob(filename_template.format("*"))
-        lstr, rstr = filename_template.split("{}")
-        sequence_ids = [int(trj[len(lstr):len(trj) - len(rstr)])
-                        for trj in trajectory_files]
-        if first_sequence is None:
-            first_sequence = min(sequence_ids)
-        if last_sequence is None:
-            last_sequence = max(sequence_ids)
-        for i in range(first_sequence, last_sequence + 1):
-            if i not in sequence_ids:
-                raise TrajectoryNotFound(str(format(i)))
-        self.first = first_sequence
-        self.last = last_sequence
+        if '{}' in filename_template:
+            trajectory_files = glob.glob(filename_template.format("*"))
+            if len(trajectory_files) == 0:
+                raise RickFlowException("No trajectory files matching your filename template.")
+            lstr, rstr = filename_template.split("{}")
+            sequence_ids = [int(trj[len(lstr):len(trj) - len(rstr)])
+                            for trj in trajectory_files]
+            if first_sequence is None:
+                first_sequence = min(sequence_ids)
+            if last_sequence is None:
+                last_sequence = max(sequence_ids)
+            for i in range(first_sequence, last_sequence + 1):
+                if i not in sequence_ids:
+                    raise TrajectoryNotFound(str(format(i)))
+            self.first = first_sequence
+            self.last = last_sequence
+        else:  # filename_template is one file, not a template
+            self.first = 1
+            self.last = 1
 
         self.filename_template = filename_template
 
@@ -105,7 +113,7 @@ class TrajectoryIterator(object):
         self.infer_time = infer_time
         self.time_between_frames = float(time_between_frames)
         self.num_frames_per_trajectory = num_frames_per_trajectory
-        self.load_function = load_function
+        self.load_function = self.interpret_load_function(filename_template, load_function)
 
     def __iter__(self):
         for i in range(self.first, self.last + 1):
@@ -143,6 +151,27 @@ class TrajectoryIterator(object):
                 ((i-1) * self.num_frames_per_trajectory + trajectory.n_frames) * self.time_between_frames,
                 step=self.time_between_frames
             )
+
+    def select(self, selection_string):
+        try:
+            return self.topology.select(selection_string)
+        except ValueError:
+            raise RickFlowException(f"Selection {selection_string} invalid.")
+
+    @staticmethod
+    def interpret_load_function(filename, load_function=md.load):
+        # Interpret load_function argument
+        suffix = filename.split(".")[-1]
+        if load_function is None:
+            load_function = md.load
+        # Interpret .trj files as .dcd
+        if load_function == md.load and suffix == "trj":
+            return md.load_dcd
+        elif isinstance(load_function, str):
+            return getattr(md, "load_{}".format(load_function))
+        else:
+            return load_function
+
 
 
 class CharmmTrajectoryIterator(TrajectoryIterator):

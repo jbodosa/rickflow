@@ -37,7 +37,7 @@ setup(
     description="Running and Analyzing OpenMM Jobs",
     entry_points={
         'console_scripts': [
-            'rflow=rflow.cli:main',
+            'rflow=rflow.cli:entrypoint',
         ],
     },
     install_requires=requirements,

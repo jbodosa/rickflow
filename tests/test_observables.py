@@ -10,7 +10,7 @@ from pytest import approx
 from rflow.observables import *
 from simtk.openmm.app import PME, HBonds
 import simtk.unit as u
-from rflow import RickFlow, TrajectoryIterator
+from rflow import RickFlow, CWD
 from rflow import abspath
 
 import mdtraj as md
@@ -164,4 +164,19 @@ def test_energy_decomposition(tmpdir):
     )
     data_frame = energy_evaluator.as_data_frame(energies) # only testing the API
     assert recalculated == approx(from_simulation, abs=0.1)
+
+
+def test_moduli_input(tmpdir, ord2_traj):
+    """only test API"""
+    heads = ord2_traj.topology.select("resname DPPC and name C2")
+    tails = [ord2_traj.topology.select("resname DPPC and name C216"),
+             ord2_traj.topology.select("resname DPPC and name C316")]
+    print(heads.shape, np.array(tails).shape)
+    with CWD(str(tmpdir)):
+        moduli_input = ModuliInput(heads, tails)
+        moduli_input(ord2_traj)
+    assert all(os.path.isfile(os.path.join(str(tmpdir)), f"boxsize{x}.out") for x in "XYZ")
+    assert all(os.path.isfile(os.path.join(str(tmpdir)), f"Lipid{x}.out") for x in "XYZ")
+
+
 

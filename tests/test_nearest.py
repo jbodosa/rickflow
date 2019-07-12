@@ -101,10 +101,10 @@ def test_coarsen(nna):
     assert nnr_coarse.counts[0,0,0,0] == np.sum(nnr_fine.counts[:5,0,0,0])
 
 
-def test_example():
+def test_example(ord2_traj):
     """Test the neighbor counting against a slow but more-reliable version."""
     # setup system
-    traj = md.load_dcd(abspath("data/ord2.dcd"), top=abspath("data/ord+o2.psf"))
+    traj = ord2_traj
     top = traj.topology
     # select atoms
     chainatoms = "((name =~ 'C2.*') or (name =~ 'C3.*'))"

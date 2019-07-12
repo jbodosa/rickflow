@@ -53,4 +53,14 @@ def test_compute_center_of_mass_selection(iterator):
             assert com == pytest.approx(reference_com, 1e-4)
 
 
+def test_file_format_by_name():
+    traj = TrajectoryIterator(
+        filename_template=abspath("data/whex{}.dcd"),
+        first_sequence=1, last_sequence=2,
+        topology_file=abspath("data/whex.pdb"),
+        load_function="dcd")
+    assert traj.first == 1
+    assert traj.last == 2
+
+
 # INFERRING TIME FOR THE FRAMES IS TESTED IN test_rickflow.py::test_run_and_restart
