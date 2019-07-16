@@ -79,6 +79,20 @@ def test_permeability(whex_iterator):
     assert pcount.permeability(dist, mode="semi-permeation") > 0.0
 
 
+def test_permeability(whex_iterator):
+    """Just testing the API at this point."""
+    iterator = whex_iterator
+    water_o = iterator.topology.select("water and mass > 15")
+    dist = Distribution(atom_selection=water_o, coordinate=2, nbins=4)
+    pcount = PermeationEventCounter(water_o, 0.11, 0.1, membrane="water", initialize_all_permeants=True)
+    for seq in iterator:
+        dist(seq)
+        pcount(seq)
+    min_p, max_p = pcount.permeability_error(dist, mode="semi-permeation", alpha=0.9)
+    assert min_p > 0.0
+    assert max_p > 0.0
+    assert max_p > min_p
+
 def test_permeation_warnings(whex_iterator):
     iterator = whex_iterator
     water = iterator.topology.select("water")

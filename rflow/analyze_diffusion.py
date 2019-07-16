@@ -8,6 +8,7 @@ Analysis tools for diffusivity and membrane permeation.
 from warnings import warn
 
 import numpy as np
+import pandas as pd
 
 from simtk import unit as u
 
@@ -323,37 +324,120 @@ class PermeationEventCounter(object):
 
     def permeability(self, permeant_distribution, start_frame=0, end_frame=None,
                      time_between_frames=1*u.picosecond, mode='crossings', num_bins_in_water=2):
+        """
+        Calculate the permeability.
+
+        Args:
+            permeant_distribution (rflow.Distribution): The permeant distribution.
+            start_frame (int): Trajectory frame to start counting events.
+            end_frame (int or None): Trajectory frame to stop counting events. If None, take last frame.
+            time_between_frames (float): Time between trajectory frames in ps.
+            mode (str): Type of events on which the permeability calculation is based.
+                        Either 'crossings', 'rebounds', or 'semi-permeation'.
+            num_bins_in_water (int): Number of bins considered to be in the water phase.
+
+        Returns:
+            float: Permeability in cm/s
+        """
         return self.calculate_permeability(
             self.events, permeant_distribution, num_permeants=len(self.solute_ids),
             start_frame=start_frame, end_frame=end_frame,
             time_between_frames=time_between_frames, mode=mode,
             num_bins_in_water=num_bins_in_water)
 
+    def permeability_error(self, permeant_distribution, start_frame=0, end_frame=None,
+                     time_between_frames=1*u.picosecond, mode='crossings', num_bins_in_water=2, alpha=0.95):
+        """
+        Calculate the error on the permeability based on the uncertainty in the number of events.
+        This error estimate does not take into account the uncertainty in the permeant distribution.
+        It may also underestimates the errors, when events are not independent (this is most likely to happen
+        for mode='semi-permeation' but depends strongly on the simulation).
+
+        Args:
+            permeant_distribution (rflow.Distribution): The permeant distribution.
+            start_frame (int): Trajectory frame to start counting events.
+            end_frame (int or None): Trajectory frame to stop counting events. If None, take last frame.
+            time_between_frames (float): Time between trajectory frames in ps.
+            mode (str): Type of events on which the permeability calculation is based.
+                        Either 'crossings', 'rebounds', or 'semi-permeation'.
+            num_bins_in_water (int): Number of bins considered to be in the water phase.
+            alpha(float): The confidence interval (default: 0.95 = 95%)
+
+        Returns:
+            A pair of floats:
+                - Min. permeability in cm/s
+                - Max. permeability in cm/s
+        """
+        from scipy.stats import poisson
+        num_events = self.num_events(self.events,mode=mode, start_frame=start_frame, end_frame=end_frame)
+        min_crossings, max_crossings = poisson.interval(alpha, num_events)
+        min_p = self.calculate_permeability(
+            min_crossings, permeant_distribution, num_permeants=len(self.solute_ids),
+            start_frame=start_frame, end_frame=end_frame,
+            time_between_frames=time_between_frames, mode=mode,
+            num_bins_in_water=num_bins_in_water)
+        max_p = self.calculate_permeability(
+            max_crossings, permeant_distribution, num_permeants=len(self.solute_ids),
+            start_frame=start_frame, end_frame=end_frame,
+            time_between_frames=time_between_frames, mode=mode,
+            num_bins_in_water=num_bins_in_water)
+        return min_p, max_p
+
     @staticmethod
-    def calculate_permeability(events, permeant_distribution, num_permeants=None, start_frame=0, end_frame=None,
-                               time_between_frames=1*u.picosecond, mode='crossings', num_bins_in_water=2):
-        # try to set default arguments
+    def num_events(events, mode='crossings', start_frame=0, end_frame=None):
+        """
+        The number of events of a certain type.
+
+        Args:
+            events (pd.DataFrame or dictionary): The events.
+            mode (str): The type of events ('crossings', 'rebounds', or 'semi-permeation')
+            start_frame (int): Frame to start counting.
+            end_frame (int): Frame to stop counting.
+
+        Returns:
+            int: The number of events.
+        """
+        try:
+            [event['type'] for event in events]
+        except:
+            return int(events)
         if end_frame is None:
-            end_frame = permeant_distribution.n_frames
-        if num_permeants is None:
-            num_permeants = len(permeant_distribution.atom_selection)
-        # initialize chosen counting method
-        if mode == 'crossings':
-            factor = 2.0
-            counted_events = ["crossing"]
-        elif mode == 'rebounds':
-            factor = 4.0
-            counted_events = ["crossing", "rebound"]
-        elif mode == 'semi-permeation':
-            factor = 8.0
-            counted_events = ["crossing", "rebound", "entry"]
-        else:
-            raise RickFlowException("mode has to be 'crossings', 'rebounds', or 'semi-permeation'")
-        # count permeation events
+            end_frame = np.infty
+        counted_events = {'crossings': ['crossing'], 'rebounds': ["crossing", "rebound"],
+                          'semi-permeation':["crossing", "rebound", "entry"]}[mode]
         num_events = 0
         for event in events:
             if (event["type"] in counted_events) and (event["frame"] >= start_frame) and (event["frame"] <= end_frame):
                 num_events += 1
+        return num_events
+
+    @staticmethod
+    def calculate_permeability(events, permeant_distribution, num_permeants=None, start_frame=0, end_frame=None,
+                               time_between_frames=1*u.picosecond, mode='crossings', num_bins_in_water=2):
+        """
+        Calculate the permeability.
+        Args:
+            events (a dict, pd.DataFrame, or integer): The events or the number of events.
+            permeant_distribution (rflow.Distribution): The permeant distribution.
+            num_permeants (int or None): If None, figure out the number of permeants from the distribution.
+            start_frame (int): Trajectory frame to start counting events.
+            end_frame (int or None): Trajectory frame to stop counting events. If None, take last frame.
+            time_between_frames (float): Time between trajectory frames in ps.
+            mode (str): Type of events on which the permeability calculation is based.
+                        Either 'crossings', 'rebounds', or 'semi-permeation'.
+            num_bins_in_water (int): Number of bins considered to be in the water phase.
+
+        Returns:
+            float: Permeability in cm/s
+        """
+        if end_frame is None:
+            end_frame = permeant_distribution.n_frames
+        # try to set default arguments
+        if num_permeants is None:
+            num_permeants = len(permeant_distribution.atom_selection)
+        # initialize chosen counting method
+        factor = {'crossings': 2.0, 'rebounds': 4.0, 'semi-permeation': 8.0}[mode]
+        num_events = PermeationEventCounter.num_events(events, mode, start_frame, end_frame)
         # get simulated time
         tsim = (end_frame - start_frame + 1) * time_between_frames
         # normalize free energy to be zero in the water
