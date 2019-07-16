@@ -350,7 +350,7 @@ class PermeationEventCounter(object):
         """
         Calculate the error on the permeability based on the uncertainty in the number of events.
         This error estimate does not take into account the uncertainty in the permeant distribution.
-        It may also underestimates the errors, when events are not independent (this is most likely to happen
+        It may also underestimate the errors, when events are not independent (this is most likely to happen
         for mode='semi-permeation' but depends strongly on the simulation).
 
         Args:
