@@ -220,7 +220,7 @@ def moduli_input(ctx, head, tail, whead, wtail, bilayer_normal, box_prefix="boxs
     )
     click.echo(f"Will save results to {box_prefix}[XYZ].out and {lipid_prefix}[XYZ].out")
     for traj in trajectories:
-        print(f"Sequence {traj.i}/{len(trajectories)}")
+        print(f"Sequence {traj.i}/{trajectories.last}")
         moduli_input(traj)
 
 
