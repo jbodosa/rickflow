@@ -175,8 +175,8 @@ def test_moduli_input(tmpdir, ord2_traj):
     with CWD(str(tmpdir)):
         moduli_input = ModuliInput(heads, tails)
         moduli_input(ord2_traj)
-    assert all(os.path.isfile(os.path.join(str(tmpdir)), f"boxsize{x}.out") for x in "XYZ")
-    assert all(os.path.isfile(os.path.join(str(tmpdir)), f"Lipid{x}.out") for x in "XYZ")
+    assert all(os.path.isfile(os.path.join(str(tmpdir), f"boxsize{x}.out")) for x in "XYZ")
+    assert all(os.path.isfile(os.path.join(str(tmpdir), f"Lipid{x}.out")) for x in "XYZ")
 
 
 
