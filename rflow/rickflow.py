@@ -26,89 +26,6 @@ from rflow.utility import CWD, get_barostat, get_force
 from rflow import omm_vfswitch, select_atoms
 
 
-def get_next_seqno_and_checkpoints(work_dir="."):
-    """
-    Sets up the directory structure and reads the id of the next sequence
-    to be simulated.
-
-    Returns:
-        A triple (next_seqno, checkpoint_file, state_file):
-
-         - int: number of the next sequence
-         - string: name of the checkpoint file to be read from
-           (None, if next_seqno=1)
-         - string: name of the state file to be read from
-           (None, if next_seqno=1)
-
-    Raises:
-          LastSequenceReached: If the number in the file next.seqno is larger
-          than the number in the file last.seqno
-    """
-    with CWD(work_dir):
-        if not os.path.isdir("trj"):  # directory for trajectories
-            os.mkdir("trj")
-        if not os.path.isdir("out"):  # directory for state files
-            os.mkdir("out")
-        if not os.path.isdir("res"):  # directory for restart files
-            os.mkdir("res")
-        if not os.path.isdir("log"):  # directory for slurm output files
-            os.mkdir("log")
-
-        # a file containing the id of the next sequence to be simulated
-        if not os.path.isfile("next.seqno"):
-            with open("next.seqno", 'w') as fp:
-                fp.write("1")
-            next_seqno = 1
-        else:
-            with open("next.seqno", 'r') as fp:
-                next_seqno = int(fp.read())
-
-        # a file containing the id of the last sequence to be simulated
-        if os.path.isfile("last.seqno"):
-            with open("last.seqno", 'r') as fp:
-                last_seqno = int(fp.read())
-                if next_seqno > last_seqno:
-                    raise LastSequenceReached(last_seqno)
-
-        current_checkpoint_file = None
-        current_state_file = None
-        if next_seqno > 1:
-            current_checkpoint_file = "res/checkpoint{}.chk".format(next_seqno - 1)
-            current_state_file = "res/state{}.xml".format(next_seqno - 1)
-
-    return next_seqno, current_checkpoint_file, current_state_file
-
-
-def require_cuda(gpu_id=None, precision="mixed"):
-    """
-    Require CUDA to be used for the simulation.
-
-    Args:
-        gpu_id (int): The id of the GPU to be used.
-        precision (str): 'mixed', 'double', or 'single'
-
-    Returns:
-        A pair (platform, properties):
-
-         - OpenMM Platform object: The platform to be passed to the simulation.
-         - dict: A dictionary to be passed to the simulation.
-
-    Raises:
-        NoCuda: If CUDA is not present.
-    """
-    try:
-        assert "LD_LIBRARY_PATH" in os.environ
-        assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
-        my_platform = Platform.getPlatformByName('CUDA')
-    except Exception as e:
-        raise NoCuda(e)
-    if gpu_id is not None:
-        my_properties = {'DeviceIndex': str(gpu_id),
-                         'Precision': precision
-                         }
-    return my_platform, my_properties
-
-
 class RickFlow(object):
     """
     Runs a simulation in OpenMM in sequences.
@@ -149,6 +66,8 @@ class RickFlow(object):
             recenter_coordinates (bool): If True, recenter initial coordinates around center of mass
                 of non-water molecules.
             switch_distance (simtk.unit): Switching distance for LJ potential.
+            cutoff_distance (simtk.unit): Cutoff distance for LJ potential.
+            use_vdw_force_switch (bool): If True, use the van-der-Waals force switch via a CustomNonbondedForce.
             work_dir (str): The working directory.
             tmp_output_dir (str): A temporary directory for output during simulations.
             dcd_output_interval (int): Number of time steps between trajectory frames.
@@ -493,4 +412,86 @@ class RickFlow(object):
             equilibration.saveState("equilibrated.xml")
             self.simulation.loadState("equilibrated.xml")
 
+
+def get_next_seqno_and_checkpoints(work_dir="."):
+    """
+    Sets up the directory structure and reads the id of the next sequence
+    to be simulated.
+
+    Returns:
+        A triple (next_seqno, checkpoint_file, state_file):
+
+         - int: number of the next sequence
+         - string: name of the checkpoint file to be read from
+           (None, if next_seqno=1)
+         - string: name of the state file to be read from
+           (None, if next_seqno=1)
+
+    Raises:
+          LastSequenceReached: If the number in the file next.seqno is larger
+          than the number in the file last.seqno
+    """
+    with CWD(work_dir):
+        if not os.path.isdir("trj"):  # directory for trajectories
+            os.mkdir("trj")
+        if not os.path.isdir("out"):  # directory for state files
+            os.mkdir("out")
+        if not os.path.isdir("res"):  # directory for restart files
+            os.mkdir("res")
+        if not os.path.isdir("log"):  # directory for slurm output files
+            os.mkdir("log")
+
+        # a file containing the id of the next sequence to be simulated
+        if not os.path.isfile("next.seqno"):
+            with open("next.seqno", 'w') as fp:
+                fp.write("1")
+            next_seqno = 1
+        else:
+            with open("next.seqno", 'r') as fp:
+                next_seqno = int(fp.read())
+
+        # a file containing the id of the last sequence to be simulated
+        if os.path.isfile("last.seqno"):
+            with open("last.seqno", 'r') as fp:
+                last_seqno = int(fp.read())
+                if next_seqno > last_seqno:
+                    raise LastSequenceReached(last_seqno)
+
+        current_checkpoint_file = None
+        current_state_file = None
+        if next_seqno > 1:
+            current_checkpoint_file = "res/checkpoint{}.chk".format(next_seqno - 1)
+            current_state_file = "res/state{}.xml".format(next_seqno - 1)
+
+    return next_seqno, current_checkpoint_file, current_state_file
+
+
+def require_cuda(gpu_id=None, precision="mixed"):
+    """
+    Require CUDA to be used for the simulation.
+
+    Args:
+        gpu_id (int): The id of the GPU to be used.
+        precision (str): 'mixed', 'double', or 'single'
+
+    Returns:
+        A pair (platform, properties):
+
+         - OpenMM Platform object: The platform to be passed to the simulation.
+         - dict: A dictionary to be passed to the simulation.
+
+    Raises:
+        NoCuda: If CUDA is not present.
+    """
+    try:
+        assert "LD_LIBRARY_PATH" in os.environ
+        assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
+        my_platform = Platform.getPlatformByName('CUDA')
+    except Exception as e:
+        raise NoCuda(e)
+    if gpu_id is not None:
+        my_properties = {'DeviceIndex': str(gpu_id),
+                         'Precision': precision
+                         }
+    return my_platform, my_properties
 
