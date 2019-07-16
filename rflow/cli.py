@@ -190,9 +190,9 @@ def moduli_input(ctx, head, tail, whead, wtail, bilayer_normal, box_prefix="boxs
     Generate input files for bilayer moduli analysis.
 
     Example:
-    >>> rflow traj -t tests/data/ord2.dcd --top=tests/data/ord+o2.psf \
-            moduli-input "resname DPPC and name C2" \
-            -t "resname DPPC and name C216" \
+    >>> rflow traj -t tests/data/ord2.dcd --top=tests/data/ord+o2.psf
+            moduli-input "resname DPPC and name C2"
+            -t "resname DPPC and name C216"
             -t "resname DPPC and name C316"
 
     """

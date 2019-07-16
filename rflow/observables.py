@@ -364,6 +364,7 @@ class ModuliInput(object):
             with open(self.boxfile(coordinate), mode) as fp:
                 fp.write(self.vector2string(boxsize[:,coordinate]))
             with open(self.lipidfile(coordinate), mode) as fp:
-                vector = (np.column_stack([head_positions[:,:,coordinate] + tail_positions[:,:,coordinate]])).flatten()
+                vector = (np.stack([head_positions[:,:,coordinate], tail_positions[:,:,coordinate]], axis=-1)).flatten()
                 fp.write(self.vector2string(vector))
+
 
