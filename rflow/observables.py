@@ -346,6 +346,13 @@ class ModuliInput(object):
         # geometric center of tail atoms in each lipid
         averaged_head_positions = np.average(head_positions, weights=self.head_weights, axis=2)
         averaged_tail_positions = np.average(tail_positions, weights=self.tail_weights, axis=2)
+        # shift center to boxsize/2 in the x and y axis (only necessary for comparison and can
+        # probably be removed at a later stage)
+        for coordinate in (0,1):
+            if abs(averaged_head_positions[:,:,coordinate].mean()) < 0.25 * boxsize[:, coordinate].mean():
+                # Trajectory is centered around zero
+                averaged_head_positions[:,:,coordinate] += 0.5*boxsize[:,None,coordinate]
+                averaged_tail_positions[:,:,coordinate] += 0.5*boxsize[:,None,coordinate]
         self.write(boxsize, averaged_head_positions, averaged_tail_positions)
 
     def boxfile(self, coordinate):

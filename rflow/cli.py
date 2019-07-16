@@ -206,9 +206,9 @@ def moduli_input(ctx, head, tail, whead, wtail, bilayer_normal, box_prefix="boxs
             sys.exit(1)
         head_atoms.append(selected)
     for t in tail:
-        selected = trajectories.select(h)
+        selected = trajectories.select(t)
         if len(selected) == 0:
-            click.echo(f"Error: Selection '{h}' empty.")
+            click.echo(f"Error: Selection '{t}' empty.")
             sys.exit(1)
         tail_atoms.append(selected)
     if len(whead) == 0: whead = None
