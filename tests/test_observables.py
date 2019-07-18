@@ -110,6 +110,14 @@ def test_distribution(whex_iterator):
     assert dist.counts.sum() == 200*1
 
 
+def test_distribution_time_series(whex_iterator):
+    dist = TimeSeries(Distribution(atom_selection=[51], coordinate=2, nbins=10))
+    for seq in whex_iterator:
+        dist(seq)
+    print(dist.data)
+    assert dist.as_array().shape == (2,10)
+
+
 def test_distribution_save(whex_iterator, tmpdir):
     datafile = os.path.join(str(tmpdir), "distribution.txt")
     dist = Distribution(atom_selection=[51], coordinate=2, nbins=10)

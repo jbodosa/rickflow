@@ -67,6 +67,9 @@ class TimeSeries(object):
         if self.filename is not None:
             np.savetxt(self.filename, self._data, header=self.name)
 
+    def as_array(self):
+        return np.array(self._data)
+
 
 class AreaPerLipid(object):
     def __init__(self, num_lipids_per_leaflet):
@@ -172,6 +175,7 @@ class Distribution(BinEdgeUpdater):
         normalized = normalize(trajectory, self.coordinate, subselect=atom_ids, com_selection=com_ids)
         histogram = np.histogram(normalized, bins=self.num_bins, range=(0, 1))  # this is !much! faster than manual bins
         self.counts = self.counts + histogram[0]
+        return np.array([histogram[0]])
 
     def __add__(self, other):
         assert self.atom_selection == other.atom_selection
