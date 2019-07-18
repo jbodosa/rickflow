@@ -451,6 +451,35 @@ class PermeationEventCounter(object):
         # Calculate permeability
         return (fe_integral / (factor*num_permeants) * (num_events / tsim)).value_in_unit(u.centimeter/u.second)
 
+    @staticmethod
+    def calculate_permeability_and_errors(num_events, cw, tsim, area, mode='crossings', alpha=0.95):
+        """
+        Calculate permeability and confidence interval.
+        Args:
+            num_events (int): number of events
+            cw (float): Equilibrium concentration of permeant in water in #molecules/nm^3
+            tsim (float): Simulation time in nanoseconds.
+            area (float): Total bilayer cross-section area in nm^2
+            mode (str): Type of events on which the permeability calculation is based.
+                        Either 'crossings', 'rebounds', or 'semi-permeation'.
+            alpha (float): The confidence interval (default: 0.95 = 95%)
+
+        Returns:
+            A tuple:
+                - float: Permeability
+                - float: Lower limit of confidence interval
+                - float: Upper limit of confidence interval
+        Notes:
+            - At some point, I need to clean up this mess and put it into a single permeability function
+        """
+        from scipy.stats import poisson
+        factor = {'crossings': 2.0, 'rebounds': 4.0, 'semi-permeation': 8.0}[mode]
+        min_events, max_events = poisson.interval(alpha, num_events)
+        perm = lambda n: ((n/(area*(u.nanometer**2) * tsim*u.nanoseconds)/(factor*cw/(u.nanometer**3))).
+                          value_in_unit(u.centimeter/u.second))
+
+        return perm(num_events), perm(min_events), perm(max_events)
+
 
 class Distribution(rflow.observables.Distribution):
     def __init__(self, *args, **kwargs):

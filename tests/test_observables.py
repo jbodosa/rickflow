@@ -2,14 +2,13 @@
 
 """
 
-import os
-import warnings
 import glob
 import numpy as np
 from pytest import approx
 from rflow.observables import *
 from simtk.openmm.app import PME, HBonds
 import simtk.unit as u
+
 from rflow import RickFlow, CWD
 from rflow import abspath
 
@@ -135,6 +134,11 @@ def test_distribution_add(whex_iterator):
     sum_dist = sum([dist, dist2, dist3])
     assert sum_dist.average_box_size == (dist.average_box_size + dist2.average_box_size + dist3.average_box_size)/3
     assert (sum_dist.counts == dist.counts + dist2.counts + dist3.counts).all()
+    # test concentration
+    ctotal = sum_dist.concentration(area=30.0)
+    assert ctotal * (sum_dist.average_box_size * 30) == approx(len(sum_dist.atom_selection))
+    # test API
+    cpart = sum_dist.concentration(area=30.0, bins=[0,1,8,9])
 
 
 def test_energy_decomposition(tmpdir):

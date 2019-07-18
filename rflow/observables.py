@@ -136,6 +136,10 @@ class BinEdgeUpdater(object):
         edges = self.edges
         return 0.5*(edges[:-1] + edges[1:])
 
+    @property
+    def bin_width(self):
+        return self.average_box_size/self.num_bins
+
 
 class Distribution(BinEdgeUpdater):
     def __init__(self, atom_selection, coordinate, nbins=100, com_selection=None):
@@ -200,6 +204,23 @@ class Distribution(BinEdgeUpdater):
     def load_from_pic(filename):
         with open(filename, 'rb') as pic:
             return pickle.load(pic)
+
+    def concentration(self, area, bins=None, num_molecules=None):
+        """
+        Concentration of solute in a part of the system.
+        Args:
+            bins (list or np.array): a list of ids to identify the bins
+            area (float): area in nanometer
+            num_molecules (int): number of molecules, by default take the number of selected atoms.
+
+        Returns:
+            float: Concentration in #molecules/nm**3
+        """
+        if bins is None:
+            bins=list(range(self.num_bins))
+        if num_molecules is None:
+            num_molecules = len(self.atom_selection)
+        return np.sum(self.probability[bins]) * num_molecules / (len(bins)*self.bin_width) / area
 
 
 class EnergyDecomposition(object):

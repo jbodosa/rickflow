@@ -106,3 +106,11 @@ def test_permeation_warnings(whex_iterator):
     assert pcount.num_severe_warnings == 10
     print(pcount.severe_warnings)
 
+
+def test_permeability2():
+    """Only test API"""
+    p,mi,ma = PermeationEventCounter.calculate_permeability_and_errors(num_events=20, cw=0.1, area=30, tsim=50)
+    assert mi > 0
+    assert p > mi
+    assert ma > p
+
