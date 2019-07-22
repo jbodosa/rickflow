@@ -8,7 +8,7 @@ import pickle
 import numpy as np
 import pandas as pd
 
-from simtk.openmm import Context, LangevinIntegrator, NonbondedForce
+from simtk.openmm import Context, LangevinIntegrator, NonbondedForce, Platform
 from mdtraj.utils import lengths_and_angles_to_box_vectors
 import simtk.unit as u
 
@@ -230,10 +230,10 @@ class Distribution(BinEdgeUpdater):
 class EnergyDecomposition(object):
     """Calculate different potential energy terms from a trajectory
     """
-    def __init__(self, system):
+    def __init__(self, system, platform=Platform.getPlatformByName("Reference"), platform_properties={}):
         self.system = system
         dummy_integrator = LangevinIntegrator(1., 1., 1.)
-        self.context = Context(system, dummy_integrator)
+        self.context = Context(system, dummy_integrator, platform, platform_properties)
         self.forcegroups = []
 
     def assign_force_groups(self, forces):
