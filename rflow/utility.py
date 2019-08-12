@@ -6,9 +6,13 @@ import pkg_resources
 import traceback
 import numpy as np
 
-from simtk.openmm import MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat
+from simtk.openmm import (
+    MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat,
+    Platform, NonbondedForce, CustomNonbondedForce
+)
 
-from rflow.exceptions import RickFlowException
+from rflow.exceptions import RickFlowException, NoCuda
+
 
 def abspath(relative_path): # type (object) -> object
     """Get file from a path that is relative to caller's module.
@@ -105,3 +109,63 @@ def get_force(system, forcetypes):
             else:
                 raise RickFlowException("Multiple forces found get_force.")
     return result
+
+
+def require_cuda(gpu_id=None, precision="mixed"):
+    """
+    Require CUDA to be used for the simulation.
+
+    Args:
+        gpu_id (int): The id of the GPU to be used.
+        precision (str): 'mixed', 'double', or 'single'
+
+    Returns:
+        A pair (platform, properties):
+
+         - OpenMM Platform object: The platform to be passed to the simulation.
+         - dict: A dictionary to be passed to the simulation.
+
+    Raises:
+        NoCuda: If CUDA is not present.
+    """
+    try:
+        assert "LD_LIBRARY_PATH" in os.environ
+        assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
+        my_platform = Platform.getPlatformByName('CUDA')
+    except Exception as e:
+        raise NoCuda(e)
+    if gpu_id is not None:
+        my_properties = {'DeviceIndex': str(gpu_id),
+                         'Precision': precision
+                         }
+    return my_platform, my_properties
+
+
+def disable_long_range_correction(system):
+    """
+    Disable analytic long range correction.
+    This is fixed in openmm > 7.3.1.
+    """
+    for force in system.getForces():
+        if isinstance(force, NonbondedForce):
+            force.setUseDispersionCorrection(False)
+        if isinstance(force, CustomNonbondedForce):
+            force.setUseLongRangeCorrection(False)
+
+
+def read_input_coordinates(coordinate_specification):
+    """
+    Read input coordinates from diverse input.
+
+    Args:
+        coordinate_specification: Can be one of the following
+            - a np.array - do nothing
+            - a filename for a CHARMM crd file
+            - a filename for a CHARMM pdb file
+            - a 3-tuple (trajectory_filename, topology, frame_id)
+            - a pair (trajectory_filename, frame_id)
+
+    Returns: Input coordinates, box_size_guess
+    """
+    pass
+

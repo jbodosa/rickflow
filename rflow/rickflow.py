@@ -5,15 +5,10 @@ Translating Rick Venable's simulation workflow from CHARMM to OpenMM.
 """
 
 import os
-import glob
 import numpy as np
 import shutil
-import random
 
 import simtk.unit as u
-from simtk.openmm import Platform
-from simtk.openmm import CustomNonbondedForce, NonbondedForce, LangevinIntegrator
-from simtk.openmm import DrudeForce, DrudeLangevinIntegrator
 from simtk.openmm.app import Simulation
 from simtk.openmm.app import CharmmPsfFile, CharmmParameterSet, CharmmCrdFile
 from simtk.openmm.app import PME, HBonds
@@ -21,8 +16,8 @@ from simtk.openmm.app import DCDFile, StateDataReporter, PDBReporter
 
 import mdtraj as md
 
-from rflow.exceptions import LastSequenceReached, NoCuda, RickFlowException
-from rflow.utility import CWD, get_barostat, get_force
+from rflow.exceptions import LastSequenceReached, RickFlowException
+from rflow.utility import CWD, get_barostat, get_force, disable_long_range_correction, require_cuda
 from rflow import omm_vfswitch, select_atoms
 
 
@@ -155,14 +150,8 @@ class RickFlow(object):
             self.positions = self.crd.positions.value_in_unit(u.angstrom).tolist()
         except:
             self.positions = list(self.crd.positions.value_in_unit(u.angstrom))
-        # manually remove long-range correction from the nonbonded force
-        # (that will hopefully get fixed in CharmmPsfFile.createSystem
-        # # at some point)
-        for force in self.system.getForces():
-            if isinstance(force, NonbondedForce):
-                force.setUseDispersionCorrection(False)
-            if isinstance(force, CustomNonbondedForce):
-                force.setUseLongRangeCorrection(False)
+        # no LRC for charmm force fields
+        disable_long_range_correction(self.system)
         # set up misc fields
         self.context = None
         self.simulation = None
@@ -333,86 +322,6 @@ class RickFlow(object):
                 fp.write(str(self.next_seqno))
 
 
-    def equilibrate(self, target_temperature,
-                    minimize=True,
-                    minimization_tolerance=10.000000000000004 * u.kilojoule/u.mole,
-                    max_minimization_iterations=0,
-                    number_of_equilibration_steps=100000,
-                    start_temperature=100 * u.kelvin,
-                    gpu_id=0
-                    ):
-        """Energy minimization and gradual heating to get a stable starting configuration.
-
-        Args:
-            target_temperature:
-            minimize (bool): Whether to perform a minimization
-            minimization_tolerance:
-            max_minimization_iterations:
-            number_of_equilibration_steps:
-            start_temperature:
-            gpu_id:
-
-        Returns:
-
-        """
-        if self.simulation is None:
-            raise RickFlowException("equilibrate can only be called after preparing the simulation "
-                                    "(RickFlow.prepareSimulation)")
-        barostat = get_barostat(self.system)
-        number_of_equilibration_steps //= 2  # two equilibration phases
-        isdrude = get_force(self.system, [DrudeForce]) is not None
-
-        with CWD(self.work_dir):
-            # set up simulation
-            if isdrude:
-                print("Found Drude Force.")
-                integrator = DrudeLangevinIntegrator(start_temperature, 5.0 / u.picosecond,
-                                                1.0 * u.kelvin, 20.0 / u.picosecond,
-                                                1.0 * u.femtosecond)
-            else:
-                integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond, 1.0 * u.femtosecond)
-            if gpu_id is not None:
-                platform, platform_properties = require_cuda(gpu_id=gpu_id)
-            else:
-                platform = None
-                platform_properties = None
-            equilibration = Simulation(self.psf.topology, self.system, integrator, platform, platform_properties)
-            #self.context.getState(getP)
-            equilibration.context.setPositions(self.positions)
-            equilibration.context.setPeriodicBoxVectors(*self.psf.topology.getPeriodicBoxVectors())
-            equilibration.context.setVelocities((np.array(self.positions)*0).tolist())
-            equilibration.reporters.append(StateDataReporter(
-                "equilibration.txt", 100, step=True, time=True,
-                potentialEnergy=True, temperature=True,
-                volume=True, density=True, speed=True)
-            )
-
-            if minimize:
-                print("Starting Minimization...")
-                equilibration.minimizeEnergy(minimization_tolerance, max_minimization_iterations)
-                print("Minimization done.")
-
-            print("Starting heating ({} steps)...".format(number_of_equilibration_steps))
-            for i in range(number_of_equilibration_steps//100):
-                switch = (i*100)/number_of_equilibration_steps
-                temperature = (1-switch) * start_temperature + switch * target_temperature
-                integrator.setTemperature(temperature)
-                # apply temperature to barostat
-                if barostat is not None:
-                    equilibration.context.setParameter(barostat.Temperature(), temperature)
-                equilibration.step(100)
-
-            print("...Running {} steps at target temperature...".format(number_of_equilibration_steps))
-            integrator.setTemperature(target_temperature)
-            if barostat is not None:
-                equilibration.context.setParameter(barostat.Temperature(), target_temperature)
-            equilibration.step(number_of_equilibration_steps)
-            print("Equilibration done.")
-
-            equilibration.saveState("equilibrated.xml")
-            self.simulation.loadState("equilibrated.xml")
-
-
 def get_next_seqno_and_checkpoints(work_dir="."):
     """
     Sets up the directory structure and reads the id of the next sequence
@@ -464,34 +373,3 @@ def get_next_seqno_and_checkpoints(work_dir="."):
             current_state_file = "res/state{}.xml".format(next_seqno - 1)
 
     return next_seqno, current_checkpoint_file, current_state_file
-
-
-def require_cuda(gpu_id=None, precision="mixed"):
-    """
-    Require CUDA to be used for the simulation.
-
-    Args:
-        gpu_id (int): The id of the GPU to be used.
-        precision (str): 'mixed', 'double', or 'single'
-
-    Returns:
-        A pair (platform, properties):
-
-         - OpenMM Platform object: The platform to be passed to the simulation.
-         - dict: A dictionary to be passed to the simulation.
-
-    Raises:
-        NoCuda: If CUDA is not present.
-    """
-    try:
-        assert "LD_LIBRARY_PATH" in os.environ
-        assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
-        my_platform = Platform.getPlatformByName('CUDA')
-    except Exception as e:
-        raise NoCuda(e)
-    if gpu_id is not None:
-        my_properties = {'DeviceIndex': str(gpu_id),
-                         'Precision': precision
-                         }
-    return my_platform, my_properties
-

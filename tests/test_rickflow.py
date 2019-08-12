@@ -127,31 +127,3 @@ def test_analysis_mode(tmpdir):
         flow.run()
     assert os.listdir(work_dir) == []
 
-
-def test_equilibrate(tmpdir):
-    for do_equilibration in [True, False]:
-        work_dir = os.path.join(str(tmpdir), str(do_equilibration))
-        os.mkdir(work_dir)
-        with CWD(work_dir):
-            flow = RickFlow(
-                toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
-                psf=abspath("data/water.psf"),
-                crd=abspath("data/water.crd"),
-                box_dimensions=[25.1984] * 3,
-                gpu_id=None,
-                steps_per_sequence=100,
-                table_output_interval=10,
-                dcd_output_interval=100,
-                recenter_coordinates=False
-            )
-            # compromise the particle positions to render the simulation unstable
-            flow.positions = (np.array(flow.positions) * 0.5).tolist()
-            flow.prepareSimulation(integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond))
-            if do_equilibration:
-                flow.equilibrate(300.0*u.kelvin, gpu_id=None, number_of_equilibration_steps=300,
-                            max_minimization_iterations=100)
-                flow.run()
-            else:
-                ## check that the simulation would fail without equilibration
-                with pytest.raises(Exception): # could be a ValueError or an OpenMMException
-                    flow.run()
