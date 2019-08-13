@@ -31,3 +31,11 @@ class TrajectoryNotFound(RickFlowException):
         super(RickFlowException, self).__init__(
             "Trajectory {} could not be loaded".format(traj_name)
         )
+
+
+class SoluteAtomsNotSet(RickFlowException):
+    def __init__(self):
+        super(RickFlowException, self).__init__(
+            "solute_atoms not set. Please populate AlchemyFlow.solute_atoms "
+            "before running an alchemical simulation."
+        )

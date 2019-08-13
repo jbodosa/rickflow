@@ -9,40 +9,24 @@ import numpy as np
 import shutil
 
 import simtk.unit as u
-from simtk.openmm.app import Simulation
-from simtk.openmm.app import CharmmPsfFile, CharmmParameterSet, CharmmCrdFile
-from simtk.openmm.app import PME, HBonds
-from simtk.openmm.app import DCDFile, StateDataReporter, PDBReporter
-
-import mdtraj as md
+from simtk.openmm.app import DCDFile, StateDataReporter
 
 from rflow.exceptions import LastSequenceReached, RickFlowException
-from rflow.utility import CWD, read_input_coordinates, disable_long_range_correction, require_cuda
-from rflow import omm_vfswitch, select_atoms
+from rflow.utility import CWD, read_input_coordinates, disable_long_range_correction
+from rflow.workflow import Workflow
 
 
-class RickFlow(object):
+class RickFlow(Workflow):
     """
     Runs a simulation in OpenMM in sequences.
     """
-
-    def __init__(self, toppar, psf, crd,
-                 box_dimensions, gpu_id=0,
-                 nonbonded_method=PME,
-                 switch_distance=8*u.angstrom,
-                 cutoff_distance=12*u.angstrom,
-                 use_vdw_force_switch=True,
-                 work_dir=".",
-                 tmp_output_dir=None,
-                 dcd_output_interval=1000,
-                 table_output_interval=1000,
-                 steps_per_sequence=1000000,
-                 use_only_xml_restarts=False,
-                 misc_psf_create_system_kwargs={},
-                 initialize_velocities=True,
-                 center_around="not water",
-                 analysis_mode=False
-                 ):
+    def __init__(
+            self,
+            *args,
+            analysis_mode=False,
+            steps_per_sequence=1000000,
+            **kwargs
+    ):
         """
         The constructor sets up the system.
 
@@ -77,137 +61,13 @@ class RickFlow(object):
         Attributes:
             positions (list of np.ndarray): List of particle positions from input file; in nanometers
         """
-
-        self.work_dir = work_dir
+        super(RickFlow, self).__init__(*args, analysis_mode=analysis_mode, steps=steps_per_sequence, **kwargs)
         if not analysis_mode:
             self.next_seqno, self.current_checkpoint, self.current_state = (
                 get_next_seqno_and_checkpoints(self.work_dir)
             )
-        self.gpu_id = gpu_id
-        self.context = None
-        self.simulation = None
-        self._mdtraj_topology = None
-        self.initialize_velocities = initialize_velocities
-        self.analysis_mode = analysis_mode
 
-        # prepare temporary output directory
-        if tmp_output_dir is not None:
-            assert os.path.exists(tmp_output_dir)
-            self.tmp_output_dir = os.path.normpath(tmp_output_dir)
-            with CWD(tmp_output_dir):
-                if not os.path.isdir("trj"):  # directory for trajectories
-                    os.mkdir("trj")
-                if not os.path.isdir("out"):  # directory for state files
-                    os.mkdir("out")
-                if not os.path.isdir("res"):  # directory for restart files
-                    os.mkdir("res")
-        else:
-            self.tmp_output_dir = None
-        self.dcd_output_interval = dcd_output_interval
-        self.table_output_interval = table_output_interval
-        self.steps_per_sequence = steps_per_sequence
-        self.use_only_xml_restarts = use_only_xml_restarts
-        if not steps_per_sequence % dcd_output_interval== 0:
-            raise RickFlowException("dcd_output_interval ({}) has to be a divisor of steps_per_sequence ({}).".format(
-                dcd_output_interval, steps_per_sequence
-            ))
-        if not steps_per_sequence % table_output_interval== 0:
-            raise RickFlowException("table_output_interval ({}) has to be a divisor of steps_per_sequence ({}).".format(
-                table_output_interval, steps_per_sequence
-            ))
-
-        with CWD(self.work_dir):
-            self.parameters = CharmmParameterSet(*toppar)
-            self.psf = CharmmPsfFile(psf)
-            box_dimensions = [dim * u.angstrom for dim in box_dimensions]
-            self.psf.setBox(*box_dimensions)
-            self.positions = read_input_coordinates(crd, self.psf.topology)
-        # create system
-        self._cutoff_distance = cutoff_distance
-        self._switch_distance = switch_distance
-        self.use_vdw_force_switch = use_vdw_force_switch
-        psf_create_system_kwargs = {
-            "nonbondedMethod": nonbonded_method,
-            "nonbondedCutoff": cutoff_distance,
-            "constraints": HBonds,
-            "switchDistance": switch_distance
-        }
-        psf_create_system_kwargs.update(misc_psf_create_system_kwargs)
-        self._system = self.psf.createSystem(
-            self.parameters,
-            **psf_create_system_kwargs
-        )
-
-        # translate system so that the center of mass of non-waters is in the middle
-        if center_around is not None:
-            center_selection = self.select(center_around)
-            current_com = self.centerOfMass(center_selection)
-            target_com = (0.5 * self.psf.boxLengths).value_in_unit(u.nanometer)
-            move = target_com - current_com
-            self.positions = [xyz + move for xyz in self.positions]
-        # no LRC for charmm force fields
-        disable_long_range_correction(self.system)
-
-    @property
-    def system(self):
-        return self._system
-
-    def select(self, *args, **kwargs):
-        if self._mdtraj_topology is None:
-            self._mdtraj_topology = md.Topology.from_openmm(self.psf.topology)
-        return self._mdtraj_topology.select(*args, **kwargs)
-
-    def centerOfMass(self, particle_ids):
-        """
-        Calculate the center of mass of a subset of atoms.
-
-        Args:
-            particle_ids (list of int): The particle ids that define the subset of the system
-
-        Returns:
-            float: center of mass in nanometer
-        """
-        masses = np.array([atom.element.mass.value_in_unit(u.dalton) for atom in self.psf.topology.atoms()])
-        positions = np.array(self.positions)
-        return np.sum(
-            positions[particle_ids].transpose()
-            * masses[particle_ids],
-            axis=1
-        ) / np.sum(masses[particle_ids])
-
-    def prepareSimulation(self, integrator, barostat=None):
-        """
-        Initialize simulation object by passing an integrator and a barostat.
-
-        Args:
-            integrator (OpenMM integrator object): The integrator to be used.
-            barostat (OpenMM barostat object): The barostat. Pass None for NVT.
-        """
-        if self.use_vdw_force_switch:
-            self.apply_vdw_force_switch(switch_distance=self._switch_distance, cutoff_distance=self._cutoff_distance)
-        if self.gpu_id is not None and not self.analysis_mode:
-            platform, platform_properties = require_cuda(self.gpu_id)
-        else:
-            platform = None
-            platform_properties = None
-        if barostat:
-            self.system.addForce(barostat)
-
-        with CWD(self.work_dir):
-            self.simulation = Simulation(self.psf.topology, self.system,
-                                         integrator, platform,
-                                         platform_properties)
-            self.context = self.simulation.context
-            self._initializeState()
-            # write the system as a pdb file (this is important for postprocessing,
-            # if virtual sites were manually added to the system)
-            if not self.analysis_mode:
-                PDBReporter("system.pdb", 1).report(
-                    self.simulation, self.context.getState(getPositions=True)
-                )
-                print("#Running on ", self.context.getPlatform().getName())
-
-    def _initializeState(self):
+    def _initialize_state(self):
         """
         Initialize state, use checkpoint for seqno > 1.
         """
@@ -247,11 +107,6 @@ class RickFlow(object):
             self.simulation.currentStep = last_step
             self.context.setTime(last_time)
         self.context.applyConstraints(1e-7)
-
-    def apply_vdw_force_switch(self, switch_distance, cutoff_distance):
-        """Use van der Waals force switch.
-        Should be called after every custom nonbonded force has been added to the system."""
-        self._system = omm_vfswitch.vfswitch(self._system, self.psf, switch_distance, cutoff_distance)
 
     def run(self):
         """

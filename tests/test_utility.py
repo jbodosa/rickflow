@@ -1,4 +1,6 @@
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -30,16 +32,18 @@ def test_increment():
 )
 def test_read_input_coordinates(trajectory_file, topology_file, frame):
     """check if input coordinates can be read from various sources"""
-    psf = CharmmPsfFile(topology_file)
-    topology = md.Topology.from_openmm(psf.topology)
-    for top in [topology, topology_file]:
-        pos = read_input_coordinates(trajectory_file, top)
-        pos = read_input_coordinates(trajectory_file, top, frame)
-        # check if context can be created
-        system = System()
-        for _ in topology.atoms:
-            system.addParticle(1.0)
-        context = Context(system, VerletIntegrator(1.0))
-        context.setPositions(pos)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        psf = CharmmPsfFile(topology_file)
+        topology = md.Topology.from_openmm(psf.topology)
+        for top in [topology, topology_file]:
+            pos = read_input_coordinates(trajectory_file, top)
+            pos = read_input_coordinates(trajectory_file, top, frame)
+            # check if context can be created
+            system = System()
+            for _ in topology.atoms:
+                system.addParticle(1.0)
+            context = Context(system, VerletIntegrator(1.0))
+            context.setPositions(pos)
 
 

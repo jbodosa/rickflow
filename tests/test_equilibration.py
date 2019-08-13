@@ -32,8 +32,15 @@ def test_equilibrate(tmpdir):
             flow.positions = (np.array(flow.positions) * 0.5).tolist()
             flow.prepareSimulation(integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond))
             if do_equilibration:
-                equilibrate(flow.simulation, 300.0*u.kelvin, gpu_id=None, number_of_equilibration_steps=300,
-                            max_minimization_iterations=100, work_dir=str(tmpdir))
+                equilibrate(
+                    flow.simulation,
+                    300.0*u.kelvin,
+                    gpu_id=None,
+                    equilibration=300*u.femtosecond,
+                    num_high_pressure_steps=50,
+                    num_minimization_steps=100,
+                    work_dir=str(tmpdir)
+                )
                 flow.run()
             else:
                 ## check that the simulation would fail without equilibration
