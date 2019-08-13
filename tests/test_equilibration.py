@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from simtk import unit as u
-from simtk.openmm import LangevinIntegrator
+from simtk.openmm import LangevinIntegrator, MonteCarloBarostat
 from rflow.utility import CWD, abspath
 from rflow.rickflow import RickFlow
 from rflow.equilibration import equilibrate
@@ -30,11 +30,17 @@ def test_equilibrate(tmpdir):
             )
             # compromise the particle positions to render the simulation unstable
             flow.positions = (np.array(flow.positions) * 0.5).tolist()
-            flow.prepareSimulation(integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond))
+            flow.prepareSimulation(
+                integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond),
+                barostat=MonteCarloBarostat(1.0*u.atmosphere, 300*u.kelvin, 25)
+            )
+            # test getting and setting the temperature
+            assert flow.temperature.value_in_unit(u.kelvin) == pytest.approx(300.0)
+            flow.temperature = 299.0
+            assert flow.temperature.value_in_unit(u.kelvin) == pytest.approx(299.0)
             if do_equilibration:
                 equilibrate(
                     flow.simulation,
-                    300.0*u.kelvin,
                     gpu_id=None,
                     equilibration=300*u.femtosecond,
                     num_high_pressure_steps=50,

@@ -132,9 +132,9 @@ class RickFlow(Workflow):
                                       volume=True, density=True, speed=True))
 
                 # run one sequence
-                print("Starting {} steps".format(self.steps_per_sequence))
+                print("Starting {} steps".format(self.steps))
 
-                for i in range(self.steps_per_sequence // self.dcd_output_interval):
+                for i in range(self.steps // self.dcd_output_interval):
                     self.simulation.step(self.dcd_output_interval)
                     # write to dcd
                     state = self.context.getState(getPositions=True, enforcePeriodicBox=True)

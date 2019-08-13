@@ -11,7 +11,7 @@ from rflow.utility import get_barostat, get_force, CWD, require_cuda
 
 def equilibrate(
         simulation,
-        target_temperature,
+        target_temperature=None,
         minimize=True,
         num_minimization_steps=0,
         num_high_pressure_steps=20000,
@@ -29,7 +29,7 @@ def equilibrate(
     Args:
         simulation: A simulation object, whose context is already
             initialize with periodic box vectors and particle positions.
-        target_temperature:
+        target_temperature: If None, get the temperature from the simulation's integrator.
         minimize (bool): Whether to perform a minimization
         num_minimization_steps:
         num_high_pressure_steps:
@@ -47,6 +47,8 @@ def equilibrate(
     if simulation is None:
         raise RickFlowException("equilibrate can only be called after preparing the simulation "
                                 "(WorkFlow.prepareSimulation)")
+    if target_temperature is None:
+        target_temperature = simulation.context.getIntegrator().getTemperature()
     barostat = get_barostat(simulation.system)
     num_equilibration_steps = int(equilibration/time_step)  # two equilibration phases
     isdrude = get_force(simulation.system, [DrudeForce]) is not None

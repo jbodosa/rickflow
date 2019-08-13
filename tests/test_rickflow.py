@@ -14,7 +14,7 @@ import subprocess
 import pytest
 import numpy as np
 from simtk import unit as u
-from simtk.openmm import LangevinIntegrator
+from simtk.openmm import LangevinIntegrator, MonteCarloBarostat
 
 
 @pytest.fixture(scope="module")
@@ -30,9 +30,9 @@ def rickflow_instance(tmpdir_factory):
     )
 
 
-@pytest.fixture(scope="module")
-def run_and_restart(tmpdir_factory):
-    tmpdir = tmpdir_factory.mktemp('run_and_restart')
+@pytest.fixture(scope="module", params=[True, False])
+def run_and_restart(tmpdir_factory, request):
+    tmpdir = tmpdir_factory.mktemp('run_and_restart_barostat_'+str(request.param))
     rf = RickFlow(
         toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
         psf=abspath("data/water.psf"),
@@ -45,7 +45,11 @@ def run_and_restart(tmpdir_factory):
         center_around=None,
         work_dir=str(tmpdir)
     )
-    rf.prepareSimulation(LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ))
+    barostat = MonteCarloBarostat(1.0*u.atmosphere, 200.0*u.kelvin, 25) if request.param else None
+    rf.prepareSimulation(
+        integrator=LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond),
+        barostat=barostat
+    )
     rf.run()
 
     rf = RickFlow(
@@ -61,7 +65,11 @@ def run_and_restart(tmpdir_factory):
         work_dir=str(tmpdir),
         use_only_xml_restarts=True
     )
-    rf.prepareSimulation(LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ))
+    barostat = MonteCarloBarostat(1.0*u.atmosphere, 200.0*u.kelvin, 25) if request.param else None
+    rf.prepareSimulation(
+        integrator=LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ),
+        barostat=barostat
+    )
     rf.run()
     return rf
 

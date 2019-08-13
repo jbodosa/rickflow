@@ -108,7 +108,7 @@ def get_force(system, forcetypes):
         force = system.getForce(i)
         if any(isinstance(force, forcetype) for forcetype in forcetypes):
             if result is None:
-                result = (i, force)
+                result = force
             else:
                 raise RickFlowException("Multiple forces found get_force.")
     return result

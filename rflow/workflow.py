@@ -10,7 +10,7 @@ from simtk.openmm.app import (
 import mdtraj as md
 
 from rflow.utility import (
-    CWD, read_input_coordinates, disable_long_range_correction, require_cuda
+    CWD, read_input_coordinates, disable_long_range_correction, require_cuda, get_barostat
 )
 from rflow.exceptions import RickFlowException
 from rflow import omm_vfswitch
@@ -68,14 +68,14 @@ class Workflow(object):
             self.tmp_output_dir = None
         self.dcd_output_interval = dcd_output_interval
         self.table_output_interval = table_output_interval
-        self.steps_per_sequence = steps
+        self.steps = steps
         self.use_only_xml_restarts = use_only_xml_restarts
         if not steps % dcd_output_interval== 0:
-            raise RickFlowException("dcd_output_interval ({}) has to be a divisor of steps_per_sequence ({}).".format(
+            raise RickFlowException("dcd_output_interval ({}) has to be a divisor of steps ({}).".format(
                 dcd_output_interval, steps
             ))
         if not steps % table_output_interval== 0:
-            raise RickFlowException("table_output_interval ({}) has to be a divisor of steps_per_sequence ({}).".format(
+            raise RickFlowException("table_output_interval ({}) has to be a divisor of steps ({}).".format(
                 table_output_interval, steps
             ))
 
@@ -119,6 +119,22 @@ class Workflow(object):
     @system.setter
     def system(self, new_system):
         self._system = new_system
+
+    @property
+    def temperature(self):
+        if self.simulation is None:
+            raise RickFlowException("Simulation is not set up yet.")
+        return self.simulation.context.getIntegrator().getTemperature()
+
+    @temperature.setter
+    def temperature(self, temp):
+        if self.simulation is None:
+            raise RickFlowException("Simulation is not set up yet.")
+        self.simulation.context.getIntegrator().setTemperature(temp)
+        barostat = get_barostat(self.system)
+        if barostat is not None:
+            barostat.setDefaultTemperature(temp)
+            self.simulation.context.setParameter(barostat.Temperature(), temp)
 
     def select(self, *args, **kwargs):
         if self._mdtraj_topology is None:
