@@ -26,7 +26,7 @@ def test_equilibrate(tmpdir):
                 steps_per_sequence=100,
                 table_output_interval=10,
                 dcd_output_interval=100,
-                recenter_coordinates=False
+                center_around=None
             )
             # compromise the particle positions to render the simulation unstable
             flow.positions = (np.array(flow.positions) * 0.5).tolist()

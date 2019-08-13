@@ -10,6 +10,9 @@ from simtk.openmm import (
     MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat,
     Platform, NonbondedForce, CustomNonbondedForce
 )
+from simtk.openmm.app import CharmmCrdFile
+from simtk import unit as u
+import mdtraj as md
 
 from rflow.exceptions import RickFlowException, NoCuda
 
@@ -153,19 +156,31 @@ def disable_long_range_correction(system):
             force.setUseLongRangeCorrection(False)
 
 
-def read_input_coordinates(coordinate_specification):
+def read_input_coordinates(input, topology=None, frame=-1):
     """
     Read input coordinates from diverse input.
 
     Args:
-        coordinate_specification: Can be one of the following
-            - a np.array - do nothing
-            - a filename for a CHARMM crd file
-            - a filename for a CHARMM pdb file
-            - a 3-tuple (trajectory_filename, topology, frame_id)
-            - a pair (trajectory_filename, frame_id)
+        input (str): A trajectory file or a np array.
+        topology (str or openmm.Topology): A topology file or topology object
+        frame (int): Trajectory frame to read the coordinates from.
 
-    Returns: Input coordinates, box_size_guess
+    Returns:
+        Input coordinates as a list of numpy arrays; in nanometer.
+
+    Notes:
+        - All files ending in .crd or .cor are considered CHARMM coordinate files
+        - Returning as a list of arrays facilitates appending coordinates if needed.
     """
-    pass
+    if isinstance(input, np.ndarray):
+        pos = input
+    elif isinstance(input, u.Quantity):
+        pos = input.value_in_unit(u.nanometer)
+    elif input.endswith(".crd") or input.endswith(".cor"):
+        crd = CharmmCrdFile(input)
+        pos = crd.positions.value_in_unit(u.nanometer)
+    else:
+        traj = md.load(input, top=topology)
+        pos = traj.xyz[frame, :, :]
+    return list(np.array(pos))
 

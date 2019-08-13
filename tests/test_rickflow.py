@@ -42,7 +42,7 @@ def run_and_restart(tmpdir_factory):
         steps_per_sequence=20,
         table_output_interval=10,
         dcd_output_interval=10,
-        recenter_coordinates=False,
+        center_around=None,
         work_dir=str(tmpdir)
     )
     rf.prepareSimulation(LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ))
@@ -57,7 +57,7 @@ def run_and_restart(tmpdir_factory):
         steps_per_sequence=20,
         table_output_interval=10,
         dcd_output_interval=10,
-        recenter_coordinates=False,
+        center_around=None,
         work_dir=str(tmpdir),
         use_only_xml_restarts=True
     )

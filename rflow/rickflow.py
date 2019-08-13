@@ -17,7 +17,7 @@ from simtk.openmm.app import DCDFile, StateDataReporter, PDBReporter
 import mdtraj as md
 
 from rflow.exceptions import LastSequenceReached, RickFlowException
-from rflow.utility import CWD, get_barostat, get_force, disable_long_range_correction, require_cuda
+from rflow.utility import CWD, read_input_coordinates, disable_long_range_correction, require_cuda
 from rflow import omm_vfswitch, select_atoms
 
 
@@ -29,7 +29,6 @@ class RickFlow(object):
     def __init__(self, toppar, psf, crd,
                  box_dimensions, gpu_id=0,
                  nonbonded_method=PME,
-                 recenter_coordinates=True,
                  switch_distance=8*u.angstrom,
                  cutoff_distance=12*u.angstrom,
                  use_vdw_force_switch=True,
@@ -41,7 +40,7 @@ class RickFlow(object):
                  use_only_xml_restarts=False,
                  misc_psf_create_system_kwargs={},
                  initialize_velocities=True,
-                 center_around=None,
+                 center_around="not water",
                  analysis_mode=False
                  ):
         """
@@ -50,7 +49,8 @@ class RickFlow(object):
         Args:
             toppar (list): Filenames of parameter, rtf and stream files that define the parameters.
             psf (str): Charmm topology (.psf file).
-            crd (str): Initial coordinates (.crd file).
+            crd (str): Initial coordinates (coordinate or trajectory file). If the trajectory contains multiple frames,
+                the positions are initialized from the last frame.
             box_dimensions (list): Box dimensions in Angstrom.
             gpu_id (int or None): The device id of the CUDA-compatible GPU to be used. If None,
                 the use of CUDA is not enforced and OpenMM may run on a slower platform.
@@ -58,8 +58,6 @@ class RickFlow(object):
                 to the first GPU that was allocated for the current job. Therefore multiple slurm jobs
                 with `gpu_id=0` can be run on the same node and each will have its own GPU.
             nonbonded_method (OpenMM object): openmm.app.PME for cutoff-LJ, openmm.app.LJPME for LJ-PME
-            recenter_coordinates (bool): If True, recenter initial coordinates around center of mass
-                of non-water molecules.
             switch_distance (simtk.unit): Switching distance for LJ potential.
             cutoff_distance (simtk.unit): Cutoff distance for LJ potential.
             use_vdw_force_switch (bool): If True, use the van-der-Waals force switch via a CustomNonbondedForce.
@@ -72,10 +70,12 @@ class RickFlow(object):
                 arguments of the CharmmPsfFile.createSystem() call.
             use_only_xml_restarts (bool): If True, always use state files for restarts.
                 If False, try checkpoint file first.
-            center_around (selection or None): Center initial system around the selection.
-                If None, center the system around all non-TIP3Ps.
+            center_around (selection string): Center initial system around the selection. If None, don't recenter.
             analysis_mode (bool): If True, create the workflow in its initial state without
                 setting up the directory structure or requiring a GPU.
+
+        Attributes:
+            positions (list of np.ndarray): List of particle positions from input file; in nanometers
         """
 
         self.work_dir = work_dir
@@ -84,6 +84,12 @@ class RickFlow(object):
                 get_next_seqno_and_checkpoints(self.work_dir)
             )
         self.gpu_id = gpu_id
+        self.context = None
+        self.simulation = None
+        self._mdtraj_topology = None
+        self.initialize_velocities = initialize_velocities
+        self.analysis_mode = analysis_mode
+
         # prepare temporary output directory
         if tmp_output_dir is not None:
             assert os.path.exists(tmp_output_dir)
@@ -115,7 +121,7 @@ class RickFlow(object):
             self.psf = CharmmPsfFile(psf)
             box_dimensions = [dim * u.angstrom for dim in box_dimensions]
             self.psf.setBox(*box_dimensions)
-            self.crd = CharmmCrdFile(crd)
+            self.positions = read_input_coordinates(crd, self.psf.topology)
         # create system
         self._cutoff_distance = cutoff_distance
         self._switch_distance = switch_distance
@@ -133,40 +139,23 @@ class RickFlow(object):
         )
 
         # translate system so that the center of mass of non-waters is in the middle
-        if recenter_coordinates:
-            if center_around is None:
-                non_waters = [i for i in range(self.crd.natom)
-                              if "TIP" not in self.crd.resname[i]
-                              ]
-                center_around = non_waters
-            else:
-                center_around = select_atoms(md.Topology.from_openmm(self.psf.topology), center_around)
-            current_com = self.centerOfMass(center_around)
-            target_com = 0.5 * self.psf.boxLengths
+        if center_around is not None:
+            center_selection = self.select(center_around)
+            current_com = self.centerOfMass(center_selection)
+            target_com = (0.5 * self.psf.boxLengths).value_in_unit(u.nanometer)
             move = target_com - current_com
-            self.crd.positions += move
-        # save positions as list, so we can append virtual sites, if needed
-        try:
-            self.positions = self.crd.positions.value_in_unit(u.angstrom).tolist()
-        except:
-            self.positions = list(self.crd.positions.value_in_unit(u.angstrom))
+            self.positions = [xyz + move for xyz in self.positions]
         # no LRC for charmm force fields
         disable_long_range_correction(self.system)
-        # set up misc fields
-        self.context = None
-        self.simulation = None
-        self._omm_topology = None
-        self.initialize_velocities = initialize_velocities
-        self.analysis_mode = analysis_mode
 
     @property
     def system(self):
         return self._system
 
     def select(self, *args, **kwargs):
-        if self._omm_topology is None:
-            self._omm_topology = md.Topology.from_openmm(self.psf.topology)
-        return self._omm_topology.select(*args, **kwargs)
+        if self._mdtraj_topology is None:
+            self._mdtraj_topology = md.Topology.from_openmm(self.psf.topology)
+        return self._mdtraj_topology.select(*args, **kwargs)
 
     def centerOfMass(self, particle_ids):
         """
@@ -176,17 +165,15 @@ class RickFlow(object):
             particle_ids (list of int): The particle ids that define the subset of the system
 
         Returns:
-            float: center of mass in Angstrom
+            float: center of mass in nanometer
         """
-        masses = np.array(
-            [self.system.getParticleMass(i).value_in_unit(u.dalton) for i in
-             range(self.crd.natom)])
-        positions = np.array(self.crd.positions.value_in_unit(u.angstrom))
+        masses = np.array([atom.element.mass.value_in_unit(u.dalton) for atom in self.psf.topology.atoms()])
+        positions = np.array(self.positions)
         return np.sum(
             positions[particle_ids].transpose()
             * masses[particle_ids],
             axis=1
-        ) / np.sum(masses[particle_ids]) * u.angstrom
+        ) / np.sum(masses[particle_ids])
 
     def prepareSimulation(self, integrator, barostat=None):
         """
@@ -229,12 +216,7 @@ class RickFlow(object):
             if self.psf.topology.getPeriodicBoxVectors():
                 self.context.setPeriodicBoxVectors(
                     *self.psf.topology.getPeriodicBoxVectors())
-            self.context.setPositions(
-                u.Quantity(
-                    value=np.array(self.positions),
-                    unit=u.angstrom
-                )
-            )
+            self.context.setPositions(self.positions)
             if self.initialize_velocities:
                 temperature = self.simulation.integrator.getTemperature()
                 print("Setting random initial velocities with temperature {}".format(temperature))

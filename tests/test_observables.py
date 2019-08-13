@@ -160,7 +160,7 @@ def test_energy_decomposition(tmpdir):
         steps_per_sequence=10,
         table_output_interval=1,
         dcd_output_interval=1,
-        recenter_coordinates=False,
+        center_around=None,
         work_dir=str(tmpdir)
     )
     flow.prepareSimulation(LangevinIntegrator(300.0 * u.kelvin, 1/u.picosecond, 1*u.femtosecond))
