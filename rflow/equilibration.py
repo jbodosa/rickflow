@@ -36,8 +36,8 @@ def equilibrate(
         equilibration:
         start_temperature:
         gpu_id:
-        out_file:
-        restart_file:
+        out_file: If None, don't write.
+        restart_file: If None, don't write.
         work_dir:
         time_step:
 
@@ -76,11 +76,12 @@ def equilibrate(
         equilibration.context.setPeriodicBoxVectors(*list(state.getPeriodicBoxVectors()))
         equilibration.context.setVelocities((state.getPositions(asNumpy=True)*0).tolist())
 
-        equilibration.reporters.append(StateDataReporter(
-            os.path.join(work_dir, out_file), 100, step=True, time=True,
-            potentialEnergy=True, temperature=True,
-            volume=True, density=True, speed=True)
-        )
+        if out_file is not None:
+            equilibration.reporters.append(StateDataReporter(
+                os.path.join(work_dir, out_file), 100, step=True, time=True,
+                potentialEnergy=True, temperature=True,
+                volume=True, density=True, speed=True)
+            )
 
         # Phase 0: Minimization
         if minimize:
@@ -120,8 +121,10 @@ def equilibrate(
             equilibration.context.setParameter(barostat.Temperature(), target_temperature)
             barostat.setDefaultTemperature(temperature)
         equilibration.step(num_equilibration_steps)
-        print(f"Equilibration done. Writing state to {restart_file}.")
-        equilibration.saveState(restart_file)
+        print("Equilibration done.")
+        if restart_file is not None:
+            print(f"Writing state to {restart_file}.")
+            equilibration.saveState(os.path.join(work_dir, restart_file))
 
         state = equilibration.context.getState(getPositions=True, getVelocities=True)
         simulation.context.setPositions(state.getPositions())

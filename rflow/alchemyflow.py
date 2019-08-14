@@ -1,5 +1,6 @@
 
 import os
+import textwrap
 
 from openmmtools import alchemy
 
@@ -43,8 +44,8 @@ class AlchemyFlow(Workflow):
         return self._solute_atoms
 
     @solute_atoms.setter
-    def solute_atoms(self, solute_atoms):
-        self.solute_atoms = solute_atoms
+    def solute_atoms(self, atom_ids):
+        self._solute_atoms = atom_ids
 
     def _finalize_system(self):
         """Alchemically modify the system."""
@@ -63,12 +64,17 @@ class AlchemyFlow(Workflow):
         self.alchemical_state = alchemical_state
 
     def _initialize_state(self):
-        if os.path.isfile(self.dcd_file) and self.append:
-            # check if energy file is consistent with DCD file, if not set append to False and raise an exception
-            # either read checkpoint (if exists) or last dcd frame
-            self.append = False
-            raise NotImplementedError("Appending alchemical simulations is not implemented, yet.")
-        else:
+        if self.append:
+            if not os.path.isfile(self.dcd_file) or not os.path.isfile(self.energy_file):
+                self.append = False
+            else:
+                # both out files exist
+                # check if energy file is consistent with DCD file, if not set append to False and raise an exception
+                # either read checkpoint (if exists) or last dcd frame
+                # assert nframes > 0
+                self.append = False
+                raise NotImplementedError("Appending alchemical simulations is not implemented, yet.")
+        if not self.append:
             if self.psf.topology.getPeriodicBoxVectors():
                 self.context.setPeriodicBoxVectors(
                     *self.psf.topology.getPeriodicBoxVectors())
@@ -84,17 +90,37 @@ class AlchemyFlow(Workflow):
             **kwargs: Keyword arguments for equilibrate.
         """
         # ---- EQUILIBRATE ----
+        if "gpu_id" not in kwargs:
+            kwargs["gpu_id"] = self.gpu_id
+        if not "work_dir" in kwargs:
+            kwargs["work_dir"] = self.work_dir
+
         if not self.append:
             equilibrate(self.simulation, **kwargs)
 
         # ---- WRITE FILES ----
-        if not self.append or not os.path.isfile(self.dcd_file):
+        if not self.append:
             # write headers of dcd and energy file
+            with open(self.dcd_file, "wb") as f:
+                pass
+            with open(self.energy_file, "w") as f:
+                header = textwrap.dedent(
+                    """
+                    Energies of all lambda states. Time between samples: {} ps.
+                         Samples were created in lambda state {}/{} (lambda_vdw: {}, lambda_elec: {}).
+                         State1                  State2                      .....
+                    """.format(
+                        self.timestep * (self.steps/self.dcd_output_interval),
+                        self.lambda_index,
+                        len(self.lambdas_elec),
+                        self.lambdas_vdw[self.lambda_index],
+                        self.lambdas_elec[self.lambda_index]
+                    )
+                )
+                f.write(header)
 
         # ---- RUN ----
         kT = u.AVOGADRO_CONSTANT_NA * u.BOLTZMANN_CONSTANT_kB * self.temperature
-
-        energies = np.zeros([num_samples, num_states], np.float64)
 
         with open(dcd_filename, "wb") as dcd:
 

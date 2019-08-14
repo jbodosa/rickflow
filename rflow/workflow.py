@@ -1,6 +1,7 @@
 
 
 import os
+import warnings
 import numpy as np
 
 from simtk import unit as u
@@ -104,7 +105,7 @@ class Workflow(object):
         # translate system so that the center of mass of non-waters is in the middle
         if center_around is not None:
             center_selection = self.select(center_around)
-            current_com = self.centerOfMass(center_selection)
+            current_com = self.center_of_mass(center_selection)
             target_com = (0.5 * self.psf.boxLengths).value_in_unit(u.nanometer)
             move = target_com - current_com
             self.positions = [xyz + move for xyz in self.positions]
@@ -136,12 +137,18 @@ class Workflow(object):
             barostat.setDefaultTemperature(temp)
             self.simulation.context.setParameter(barostat.Temperature(), temp)
 
+    @property
+    def timestep(self):
+        if self.simulation is None:
+            raise RickFlowException("Simulation is not set up yet.")
+        return self.simulation.context.getIntegrator().getStepSize()
+
     def select(self, *args, **kwargs):
         if self._mdtraj_topology is None:
             self._mdtraj_topology = md.Topology.from_openmm(self.psf.topology)
         return self._mdtraj_topology.select(*args, **kwargs)
 
-    def centerOfMass(self, particle_ids):
+    def center_of_mass(self, particle_ids):
         """
         Calculate the center of mass of a subset of atoms.
 
@@ -160,6 +167,14 @@ class Workflow(object):
         ) / np.sum(masses[particle_ids])
 
     def prepareSimulation(self, integrator, barostat=None):
+        warnings.warn(
+            "prepareSimulation has been renamed into prepare_simulation. "
+            "Future versions of rickflow will only support the latter.",
+            DeprecationWarning
+        )
+        return self.prepare_simulation(integrator, barostat)
+
+    def prepare_simulation(self, integrator, barostat=None):
         """
         Initialize simulation object by passing an integrator and a barostat.
 
