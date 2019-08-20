@@ -3,8 +3,6 @@
 
 """Tests for `rickflow` module."""
 
-import pytest
-
 from rflow import RickFlow, CWD, TrajectoryIterator, RickFlowException
 from rflow.utility import abspath
 import glob
@@ -14,7 +12,7 @@ import subprocess
 import pytest
 import numpy as np
 from simtk import unit as u
-from simtk.openmm import LangevinIntegrator
+from simtk.openmm import LangevinIntegrator, MonteCarloBarostat
 
 
 @pytest.fixture(scope="module")
@@ -30,9 +28,9 @@ def rickflow_instance(tmpdir_factory):
     )
 
 
-@pytest.fixture(scope="module")
-def run_and_restart(tmpdir_factory):
-    tmpdir = tmpdir_factory.mktemp('run_and_restart')
+@pytest.fixture(scope="module", params=[True, False])
+def run_and_restart(tmpdir_factory, request):
+    tmpdir = tmpdir_factory.mktemp('run_and_restart_barostat_'+str(request.param))
     rf = RickFlow(
         toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
         psf=abspath("data/water.psf"),
@@ -42,10 +40,14 @@ def run_and_restart(tmpdir_factory):
         steps_per_sequence=20,
         table_output_interval=10,
         dcd_output_interval=10,
-        recenter_coordinates=False,
+        center_around=None,
         work_dir=str(tmpdir)
     )
-    rf.prepareSimulation(LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ))
+    barostat = MonteCarloBarostat(1.0*u.atmosphere, 200.0*u.kelvin, 25) if request.param else None
+    rf.prepare_simulation(
+        integrator=LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond),
+        barostat=barostat
+    )
     rf.run()
 
     rf = RickFlow(
@@ -57,11 +59,15 @@ def run_and_restart(tmpdir_factory):
         steps_per_sequence=20,
         table_output_interval=10,
         dcd_output_interval=10,
-        recenter_coordinates=False,
+        center_around=None,
         work_dir=str(tmpdir),
         use_only_xml_restarts=True
     )
-    rf.prepareSimulation(LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ))
+    barostat = MonteCarloBarostat(1.0*u.atmosphere, 200.0*u.kelvin, 25) if request.param else None
+    rf.prepare_simulation(
+        integrator=LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ),
+        barostat=barostat
+    )
     rf.run()
     return rf
 
@@ -122,36 +128,8 @@ def test_analysis_mode(tmpdir):
             misc_psf_create_system_kwargs={"constraints": None},
             analysis_mode=True
         )
-    flow.prepareSimulation(LangevinIntegrator(1, 1, 1))
+    flow.prepare_simulation(LangevinIntegrator(1, 1, 1))
     with pytest.raises(RickFlowException):
         flow.run()
     assert os.listdir(work_dir) == []
 
-
-def test_equilibrate(tmpdir):
-    for do_equilibration in [True, False]:
-        work_dir = os.path.join(str(tmpdir), str(do_equilibration))
-        os.mkdir(work_dir)
-        with CWD(work_dir):
-            flow = RickFlow(
-                toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
-                psf=abspath("data/water.psf"),
-                crd=abspath("data/water.crd"),
-                box_dimensions=[25.1984] * 3,
-                gpu_id=None,
-                steps_per_sequence=100,
-                table_output_interval=10,
-                dcd_output_interval=100,
-                recenter_coordinates=False
-            )
-            # compromise the particle positions to render the simulation unstable
-            flow.positions = (np.array(flow.positions) * 0.5).tolist()
-            flow.prepareSimulation(integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond))
-            if do_equilibration:
-                flow.equilibrate(300.0*u.kelvin, gpu_id=None, number_of_equilibration_steps=300,
-                            max_minimization_iterations=100)
-                flow.run()
-            else:
-                ## check that the simulation would fail without equilibration
-                with pytest.raises(Exception): # could be a ValueError or an OpenMMException
-                    flow.run()

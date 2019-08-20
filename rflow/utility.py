@@ -6,9 +6,16 @@ import pkg_resources
 import traceback
 import numpy as np
 
-from simtk.openmm import MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat
+from simtk.openmm import (
+    MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat,
+    Platform, NonbondedForce, CustomNonbondedForce
+)
+from simtk.openmm.app import CharmmCrdFile
+from simtk import unit as u
+import mdtraj as md
 
-from rflow.exceptions import RickFlowException
+from rflow.exceptions import RickFlowException, NoCuda
+
 
 def abspath(relative_path): # type (object) -> object
     """Get file from a path that is relative to caller's module.
@@ -101,7 +108,112 @@ def get_force(system, forcetypes):
         force = system.getForce(i)
         if any(isinstance(force, forcetype) for forcetype in forcetypes):
             if result is None:
-                result = (i, force)
+                result = force
             else:
                 raise RickFlowException("Multiple forces found get_force.")
     return result
+
+
+def get_platform(gpu_id=None, precision="mixed"):
+    """
+    Require CUDA to be used for the simulation.
+
+    Args:
+        gpu_id (int): The id of the GPU to be used.
+        precision (str): 'mixed', 'double', or 'single'
+
+    Returns:
+        A pair (platform, properties):
+
+         - OpenMM Platform object: The platform to be passed to the simulation.
+         - dict: A dictionary to be passed to the simulation.
+
+    Raises:
+        NoCuda: If CUDA is not present.
+    """
+    if gpu_id is None:
+        return None, None
+    if isinstance(gpu_id, str):
+        return Platform.getPlatformByName(gpu_id), {}
+    elif isinstance(gpu_id, int):
+        try:
+            assert "LD_LIBRARY_PATH" in os.environ
+            assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
+            my_platform = Platform.getPlatformByName('CUDA')
+            my_properties = {'DeviceIndex': str(gpu_id), 'Precision': precision}
+            return my_platform, my_properties
+        except Exception as e:
+            raise NoCuda(e)
+    else:
+        raise RickFlowException(
+            "Did not understand gpu_id. It has to be an integer, None, "
+            "or a string that contains the platform name."
+        )
+
+
+def disable_long_range_correction(system):
+    """
+    Disable analytic long range correction.
+    This is fixed in openmm > 7.3.1.
+    """
+    for force in system.getForces():
+        if isinstance(force, NonbondedForce):
+            force.setUseDispersionCorrection(False)
+        if isinstance(force, CustomNonbondedForce):
+            force.setUseLongRangeCorrection(False)
+
+
+def read_input_coordinates(input, topology=None, frame=-1):
+    """
+    Read input coordinates from diverse input.
+
+    Args:
+        input (str): A trajectory file or a np array.
+        topology (str or openmm.Topology): A topology file or topology object
+        frame (int): Trajectory frame to read the coordinates from.
+
+    Returns:
+        Input coordinates as a list of numpy arrays; in nanometer.
+
+    Notes:
+        - All files ending in .crd or .cor are considered CHARMM coordinate files
+        - Returning as a list of arrays facilitates appending coordinates if needed.
+    """
+    if isinstance(input, np.ndarray):
+        pos = input
+    elif isinstance(input, u.Quantity):
+        pos = input.value_in_unit(u.nanometer)
+    elif input.endswith(".crd") or input.endswith(".cor"):
+        crd = CharmmCrdFile(input)
+        pos = crd.positions.value_in_unit(u.nanometer)
+    else:
+        traj = md.load(input, top=topology)
+        pos = traj.xyz[frame, :, :]
+    return list(np.array(pos))
+
+
+def center_of_mass(positions, topology, selection):
+    """
+    Calculate the center of mass of a subset of atoms.
+
+    Args:
+        particle_ids (list of int): The particle ids that define the subset of the system
+
+    Returns:
+        float: center of mass in nanometer
+    """
+    masses = np.array([atom.element.mass.value_in_unit(u.dalton) for atom in topology.atoms()])
+    positions = np.array(positions)
+    return np.sum(
+        positions[selection].transpose()
+        * masses[selection],
+        axis=1
+    ) / np.sum(masses[selection])
+
+
+def recenter_positions(positions, selection, topology, box_lengths):
+    current_com = center_of_mass(positions, topology, selection)
+    target_com = 0.5*np.array(box_lengths.value_in_unit(u.nanometer))
+    move = target_com - current_com
+    return positions + move
+
