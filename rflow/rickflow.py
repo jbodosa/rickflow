@@ -51,7 +51,8 @@ class RickFlow(PsfWorkflow):
                  misc_psf_create_system_kwargs={},
                  initialize_velocities=True,
                  center_around=None,
-                 analysis_mode=False
+                 analysis_mode=False,
+                 **kwargs
                  ):
         """
         The constructor sets up the system.
@@ -100,6 +101,14 @@ class RickFlow(PsfWorkflow):
         self.initialize_velocities = initialize_velocities
         self._last_seqno = None
         self._next_seqno = None
+        if 'use_vdw_force_switch' in kwargs:
+            warnings.warn(
+                "use_vdw_force_switch is deprecated and will be removed in future versions. "
+                "Use RickFlow(....,vdw_switching='openmm'/'charmm-gui', ...) instead."
+            )
+            self.vdw_switching = "charmm-gui" if kwargs['use_vdw_force_switch'] else "openmm"
+            kwargs.pop('use_vdw_force_switch')
+        assert len(kwargs) == 0, "Keyword arguments not understood: {}".format(kwargs)
 
         if not self.analysis_mode:
             RickFlow.make_directory_structure(work_dir)

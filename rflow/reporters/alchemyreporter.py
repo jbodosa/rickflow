@@ -89,7 +89,6 @@ class AlchemyReporter(object):
         if simulation.currentStep == 0:
             return
 
-        print("Saving step", simulation.currentStep)
         energies = []
         for lambda_vdw, lambda_elec in zip(self.lambdas_vdw, self.lambdas_elec):
             self.alchemical_state.lambda_sterics = lambda_vdw
