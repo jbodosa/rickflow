@@ -1,18 +1,18 @@
 
 import os
-import textwrap
-
-from openmmtools import alchemy
+from copy import deepcopy
 
 from simtk import unit as u
 
-from rflow.workflow import Workflow
-from rflow.utility import read_input_coordinates
+from openmmtools import alchemy
+
+from rflow.workflow import PsfWorkflow
 from rflow.exceptions import SoluteAtomsNotSet
 from rflow.equilibration import equilibrate
+from rflow.reporters.alchemyreporter import AlchemyReporter
 
 
-class AlchemyFlow(Workflow):
+class AlchemyFlow(PsfWorkflow):
     """
     Alchemical free energies of annihilation.
     """
@@ -24,20 +24,41 @@ class AlchemyFlow(Workflow):
             lambdas_elec,
             dcd_file="dyn.{}.dcd",
             energy_file="ener.{}.txt",
-            restart_file="restart.{}.txt",
+            restart_file="restart.{}.xml",
+            output_frequency=1000,
+            gpu_id=0,
             append=True,
             **kwargs
     ):
+        """
+
+        Args:
+            *args:
+            lambda_index: can be the index of a list or the key of a dict
+            lambdas_vdw: a list
+            lambdas_elec: a list
+            dcd_file:
+            energy_file:
+            restart_file:
+            append:
+            **kwargs:
+        """
         super(AlchemyFlow, self).__init__(*args, **kwargs)
         self.lambda_index = lambda_index
+        # convert lists to dicts
         self.lambdas_vdw = lambdas_vdw
         self.lambdas_elec = lambdas_elec
         self._solute_atoms = None
         self.alchemical_state = None
-        self.dcd_file = os.path.join(self.work_dir, dcd_file.format(lambda_index))
-        self.energy_file = os.path.join(self.work_dir, energy_file.format(lambda_index))
-        self.restart_file = os.path.join(self.work_dir, restart_file.format(lambda_index))
-        self.append=append
+        self.dcd_file = dcd_file.format(lambda_index)
+        self.energy_file = energy_file.format(lambda_index)
+        self.restart_file = restart_file.format(lambda_index)
+        self.output_frequency = output_frequency
+        self.gpu_id = gpu_id
+        if not os.path.isfile(self.dcd_file) or not os.path.isfile(self.energy_file):
+            self.append=False
+        else:
+            self.append=append
 
     @property
     def solute_atoms(self):
@@ -47,8 +68,32 @@ class AlchemyFlow(Workflow):
     def solute_atoms(self, atom_ids):
         self._solute_atoms = atom_ids
 
-    def _finalize_system(self):
-        """Alchemically modify the system."""
+    @property
+    def num_samples(self):
+        return self.steps//self.output_frequency
+
+    @property
+    def num_lambda_states(self):
+        assert len(self.lambdas_elec) == len(self.lambdas_vdw)
+        return len(self.lambdas_elec)
+
+    def create_system(
+            self,
+            disable_lrc=True,
+            vdw_switching="vswitch",
+            switch_distance=10 * u.angstrom,
+            cutoff_distance=12 * u.angstrom,
+            **kwargs
+    ):
+        super(AlchemyFlow, self).create_system(
+            disable_lrc=disable_lrc,
+            vdw_switching=vdw_switching,
+            switch_distance=switch_distance,
+            cutoff_distance=cutoff_distance,
+            **kwargs
+        )
+
+        # Alchemically modify the system.
         if self.solute_atoms is None:
             raise SoluteAtomsNotSet()
         factory = alchemy.AbsoluteAlchemicalFactory(disable_alchemical_dispersion_correction=True,
@@ -60,108 +105,62 @@ class AlchemyFlow(Workflow):
         alchemical_state = alchemy.AlchemicalState.from_system(alchemical_system)
         alchemical_state.lambda_sterics = self.lambdas_vdw[self.lambda_index]
         alchemical_state.lambda_electrostatics = self.lambdas_elec[self.lambda_index]
-        self.system = alchemical_system
+
+        self._original_system = deepcopy(self._system)
+        self._system = deepcopy(alchemical_system)
         self.alchemical_state = alchemical_state
 
-    def _initialize_state(self):
+    def initialize_state(self, initialize_velocities=True, pdb_output_file=None):
         if self.append:
-            if not os.path.isfile(self.dcd_file) or not os.path.isfile(self.energy_file):
-                self.append = False
-            else:
-                # both out files exist
-                # check if energy file is consistent with DCD file, if not set append to False and raise an exception
-                # either read checkpoint (if exists) or last dcd frame
-                # assert nframes > 0
-                self.append = False
-                raise NotImplementedError("Appending alchemical simulations is not implemented, yet.")
+            # both out files exist
+            # check if energy file is consistent with DCD file, if not set append to False and raise an exception
+            # either read checkpoint (if exists) or last dcd frame
+            # assert nframes > 0
+            self.append = False
+            raise NotImplementedError("Appending alchemical simulations is not implemented, yet.")
         if not self.append:
-            if self.psf.topology.getPeriodicBoxVectors():
-                self.context.setPeriodicBoxVectors(
-                    *self.psf.topology.getPeriodicBoxVectors())
-            self.context.setPositions(self.positions)
-            if self.initialize_velocities:
-                temperature = self.simulation.integrator.getTemperature()
-                print("Setting random initial velocities with temperature {}".format(temperature))
-                self.context.setVelocitiesToTemperature(temperature)
+            super(AlchemyFlow, self).initialize_state(initialize_velocities, pdb_output_file)
 
-    def run(self, **kwargs):
+    def create_simulation(
+            self,
+            integrator,
+            barostat=None,
+            table_output_interval=0,
+            table_output_file="dyn.txt"
+    ):
+        super(AlchemyFlow, self).create_simulation(
+            integrator,
+            barostat,
+            gpu_id=self.gpu_id,
+            dcd_output_interval=self.output_frequency,
+            dcd_output_file=self.dcd_file,
+            table_output_interval=table_output_interval,
+            table_output_file=table_output_file
+        )
+        self.alchemical_state.apply_to_context(self.context)
+        self.simulation.reporters.append(
+            AlchemyReporter(
+                self.energy_file, self.output_frequency, self.alchemical_state, self.temperature, self.timestep,
+                self.lambdas_vdw, self.lambdas_elec, self.lambda_index, self.append
+            )
+        )
+
+    def run(self, num_steps=10000, **kwargs):
         """
         Args:
             **kwargs: Keyword arguments for equilibrate.
         """
-        # ---- EQUILIBRATE ----
-        if "gpu_id" not in kwargs:
-            kwargs["gpu_id"] = self.gpu_id
-        if not "work_dir" in kwargs:
-            kwargs["work_dir"] = self.work_dir
-
+        # equilibrate
         if not self.append:
+            if "gpu_id" not in kwargs:
+                kwargs["gpu_id"] = self.gpu_id
             equilibrate(self.simulation, **kwargs)
 
-        # ---- WRITE FILES ----
-        if not self.append:
-            # write headers of dcd and energy file
-            with open(self.dcd_file, "wb") as f:
-                pass
-            with open(self.energy_file, "w") as f:
-                header = textwrap.dedent(
-                    """
-                    Energies of all lambda states. Time between samples: {} ps.
-                         Samples were created in lambda state {}/{} (lambda_vdw: {}, lambda_elec: {}).
-                         State1                  State2                      .....
-                    """.format(
-                        self.timestep * (self.steps/self.dcd_output_interval),
-                        self.lambda_index,
-                        len(self.lambdas_elec),
-                        self.lambdas_vdw[self.lambda_index],
-                        self.lambdas_elec[self.lambda_index]
-                    )
-                )
-                f.write(header)
+        # run
+        self.simulation.step(num_steps)
 
-        # ---- RUN ----
-        kT = u.AVOGADRO_CONSTANT_NA * u.BOLTZMANN_CONSTANT_kB * self.temperature
-
-        with open(dcd_filename, "wb") as dcd:
-
-            dcd_file = DCDFile(dcd, topology, time_step, 0, steps_between_samples)
-
-            for sample in range(num_samples):
-
-                print('Production ... Sample {}/{} ... '.format(sample + 1, num_samples))
-
-                # Set to current alchemical state
-                self.alchemical_state.lambda_sterics = self.lambdas_vdw[self.lambda_index]
-                self.alchemical_state.lambda_electrostatics = self.lambdas_elec[self.lambda_index]
-                self.alchemical_state.apply_to_context(self.simulation.context)
-
-                # Run some dynamics
-                self.simulation.step(steps_between_samples)
-
-                # Save snapshot
-                state = context.getState(getPositions=True, enforcePeriodicBox=True)
-                dcd_file.writeModel(state.getPositions(), periodicBoxVectors=state.getPeriodicBoxVectors())
-
-                # Compute energies at all alchemical states
-                for state in range(num_states):
-                    alchemical_state.lambda_sterics = lambdas_vdw[state]
-                    alchemical_state.lambda_electrostatics = lambdas_elec[state]
-                    alchemical_state.apply_to_context(context)
-                    energies[sample, state] = context.getState(getEnergy=True).getPotentialEnergy() / kT
-
-        # # Save Energies
-        header = """Energies of all lambda states for {} samples. Time between samples: {}.
-         Samples were created in lambda state {}/{} (lambda_vdw: {}, lambda_elec: {}).
-         State1                  State2                      .....""".format(
-            num_samples, sample_interval, lambda_index, num_states - 1,
-            lambdas_vdw[lambda_index], lambdas_elec[lambda_index]
-        )
-        np.savetxt(energy_filename, energies, header=header)
-
-    def regenerate_energy_file(self):
-        """
-        Recalculate all energies, for example when lambda states have changed.
-        """
-        raise NotImplementedError()
-
+        self.simulation.saveState(self.restart_file)
+        print(f"Samples written to {self.dcd_file}")
+        print(f"Energies written to {self.energy_file}")
+        print(f"Restart written to {self.restart_file}")
 

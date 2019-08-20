@@ -6,7 +6,7 @@ from simtk.openmm.app import Simulation, StateDataReporter
 from simtk.openmm import (LangevinIntegrator, DrudeForce, DrudeLangevinIntegrator)
 
 from rflow.exceptions import RickFlowException
-from rflow.utility import get_barostat, get_force, CWD, require_cuda
+from rflow.utility import get_barostat, get_force, CWD, get_platform
 
 
 def equilibrate(
@@ -66,7 +66,7 @@ def equilibrate(
         else:
             integrator = LangevinIntegrator(start_temperature, 5.0 / u.picosecond, time_step)
         if gpu_id is not None:
-            platform, platform_properties = require_cuda(gpu_id=gpu_id)
+            platform, platform_properties = get_platform(gpu_id=gpu_id)
         else:
             platform = None
             platform_properties = None
@@ -83,13 +83,14 @@ def equilibrate(
                 volume=True, density=True, speed=True)
             )
 
+        print("Equilibration:")
         # Phase 0: Minimization
         if minimize:
-            print("Energy Minimization...")
+            print("...Energy Minimization...")
             equilibration.minimizeEnergy(maxIterations=num_minimization_steps)
 
         # Phase 1: Equilibration at low temperature and high pressure to prevent blow-ups
-        print("Starting high-pressure equilibration ({} steps)...".format(num_high_pressure_steps))
+        print("...Starting high-pressure equilibration ({} steps)...".format(num_high_pressure_steps))
         if barostat is not None:
             target_pressure = barostat.getDefaultPressure()
             barostat.setDefaultTemperature(start_temperature)
@@ -100,7 +101,7 @@ def equilibrate(
         equilibration.step(num_high_pressure_steps)
 
         # Phase 2: Gradual heating to target temperature at target pressure
-        print("Starting heating ({} steps)...".format(num_equilibration_steps))
+        print("...Starting heating ({} steps)...".format(num_equilibration_steps))
         if barostat is not None:
             barostat.setDefaultPressure(target_pressure)
             equilibration.context.setParameter(barostat.Pressure(), target_pressure)

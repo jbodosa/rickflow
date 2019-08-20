@@ -3,8 +3,6 @@
 
 """Tests for `rickflow` module."""
 
-import pytest
-
 from rflow import RickFlow, CWD, TrajectoryIterator, RickFlowException
 from rflow.utility import abspath
 import glob
@@ -46,7 +44,7 @@ def run_and_restart(tmpdir_factory, request):
         work_dir=str(tmpdir)
     )
     barostat = MonteCarloBarostat(1.0*u.atmosphere, 200.0*u.kelvin, 25) if request.param else None
-    rf.prepareSimulation(
+    rf.prepare_simulation(
         integrator=LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond),
         barostat=barostat
     )
@@ -66,7 +64,7 @@ def run_and_restart(tmpdir_factory, request):
         use_only_xml_restarts=True
     )
     barostat = MonteCarloBarostat(1.0*u.atmosphere, 200.0*u.kelvin, 25) if request.param else None
-    rf.prepareSimulation(
+    rf.prepare_simulation(
         integrator=LangevinIntegrator(200.*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond ),
         barostat=barostat
     )
@@ -130,7 +128,7 @@ def test_analysis_mode(tmpdir):
             misc_psf_create_system_kwargs={"constraints": None},
             analysis_mode=True
         )
-    flow.prepareSimulation(LangevinIntegrator(1, 1, 1))
+    flow.prepare_simulation(LangevinIntegrator(1, 1, 1))
     with pytest.raises(RickFlowException):
         flow.run()
     assert os.listdir(work_dir) == []

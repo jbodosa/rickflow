@@ -114,7 +114,7 @@ def get_force(system, forcetypes):
     return result
 
 
-def require_cuda(gpu_id=None, precision="mixed"):
+def get_platform(gpu_id=None, precision="mixed"):
     """
     Require CUDA to be used for the simulation.
 
@@ -131,17 +131,24 @@ def require_cuda(gpu_id=None, precision="mixed"):
     Raises:
         NoCuda: If CUDA is not present.
     """
-    try:
-        assert "LD_LIBRARY_PATH" in os.environ
-        assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
-        my_platform = Platform.getPlatformByName('CUDA')
-    except Exception as e:
-        raise NoCuda(e)
-    if gpu_id is not None:
-        my_properties = {'DeviceIndex': str(gpu_id),
-                         'Precision': precision
-                         }
-    return my_platform, my_properties
+    if gpu_id is None:
+        return None, None
+    if isinstance(gpu_id, str):
+        return Platform.getPlatformByName(gpu_id), {}
+    elif isinstance(gpu_id, int):
+        try:
+            assert "LD_LIBRARY_PATH" in os.environ
+            assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
+            my_platform = Platform.getPlatformByName('CUDA')
+            my_properties = {'DeviceIndex': str(gpu_id), 'Precision': precision}
+            return my_platform, my_properties
+        except Exception as e:
+            raise NoCuda(e)
+    else:
+        raise RickFlowException(
+            "Did not understand gpu_id. It has to be an integer, None, "
+            "or a string that contains the platform name."
+        )
 
 
 def disable_long_range_correction(system):
@@ -183,4 +190,30 @@ def read_input_coordinates(input, topology=None, frame=-1):
         traj = md.load(input, top=topology)
         pos = traj.xyz[frame, :, :]
     return list(np.array(pos))
+
+
+def center_of_mass(positions, topology, selection):
+    """
+    Calculate the center of mass of a subset of atoms.
+
+    Args:
+        particle_ids (list of int): The particle ids that define the subset of the system
+
+    Returns:
+        float: center of mass in nanometer
+    """
+    masses = np.array([atom.element.mass.value_in_unit(u.dalton) for atom in topology.atoms()])
+    positions = np.array(positions)
+    return np.sum(
+        positions[selection].transpose()
+        * masses[selection],
+        axis=1
+    ) / np.sum(masses[selection])
+
+
+def recenter_positions(positions, selection, topology, box_lengths):
+    current_com = center_of_mass(positions, topology, selection)
+    target_com = 0.5*np.array(box_lengths.value_in_unit(u.nanometer))
+    move = target_com - current_com
+    return positions + move
 

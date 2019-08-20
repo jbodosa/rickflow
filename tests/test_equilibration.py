@@ -30,7 +30,7 @@ def test_equilibrate(tmpdir):
             )
             # compromise the particle positions to render the simulation unstable
             flow.positions = (np.array(flow.positions) * 0.5).tolist()
-            flow.prepareSimulation(
+            flow.prepare_simulation(
                 integrator=LangevinIntegrator(300*u.kelvin, 5.0/u.picosecond, 1.0*u.femtosecond),
                 barostat=MonteCarloBarostat(1.0*u.atmosphere, 300*u.kelvin, 25)
             )
