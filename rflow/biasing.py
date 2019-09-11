@@ -349,6 +349,13 @@ class ConstantPullingForce(object):
             biasing_force.addParticle(particle)
         return biasing_force
 
+    def as_openmm_centroid_force(self, particle_ids):
+        biasing_force = CustomCentroidBondForce(1, str(self).replace("z","z1"))
+        groupid = biasing_force.addGroup(list(particle_ids))
+        biasing_force.addBond([groupid])
+        biasing_force.addGlobalParameter("force", self.force)
+        return biasing_force
+
     def __call__(self, z):
         return - self.force * z
 
