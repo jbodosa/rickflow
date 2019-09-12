@@ -7,7 +7,7 @@ import mdtraj as md
 
 from rflow.utility import (
     read_input_coordinates, disable_long_range_correction, get_platform, get_barostat,
-    recenter_positions
+    recenter_positions, read_box_dimensions
 )
 from rflow.exceptions import RickFlowException
 from rflow import omm_vfswitch
@@ -23,7 +23,7 @@ class PsfWorkflow(object):
             toppar,
             psf,
             crd,
-            box_dimensions,
+            box_dimensions=None,
             center_around="not water"
     ):
         self._system = None
@@ -33,10 +33,14 @@ class PsfWorkflow(object):
         # Load input files
         self.parameters = CharmmParameterSet(*toppar)
         self.psf = CharmmPsfFile(psf)
-        if box_dimensions is not None:
+        self.positions = read_input_coordinates(crd, topology=self.mdtraj_topology)
+        parsed_dimensions = read_box_dimensions(crd, topology=self.mdtraj_topology)
+        if parsed_dimensions is not None:
+            self.psf.setBox(*parsed_dimensions)
+        elif box_dimensions is not None:
             box_dimensions = [dim * u.angstrom for dim in box_dimensions]
             self.psf.setBox(*box_dimensions)
-        self.positions = read_input_coordinates(crd, self.mdtraj_topology)
+
         # process coordinates
         if center_around is not None:
             self.positions = recenter_positions(

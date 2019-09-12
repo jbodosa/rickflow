@@ -46,7 +46,7 @@ integrator = LangevinIntegrator(temperature, 1.0 / u.picosecond, 1.0 * u.femtose
 #     False, False, True
 # )
 
-workflow.prepareSimulation(integrator)#, barostat)
+workflow.prepare_simulation(integrator)#, barostat)
 
 
 

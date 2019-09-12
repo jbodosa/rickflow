@@ -37,7 +37,7 @@ class RickFlow(PsfWorkflow):
     _lst = "last.seqno"
 
     def __init__(self, toppar, psf, crd,
-                 box_dimensions, gpu_id=0,
+                 box_dimensions=None, gpu_id=0,
                  nonbonded_method=PME,
                  switch_distance=8*u.angstrom,
                  cutoff_distance=12*u.angstrom,
