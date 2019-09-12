@@ -46,7 +46,7 @@ setup(
     include_package_data=True,
     keywords='rickflow',
     name='rickflow',
-    packages=find_packages(include=['rflow']),
+    packages=find_packages(include=['rflow','rflow.reporters']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
