@@ -36,7 +36,7 @@ class PsfWorkflow(object):
         if box_dimensions is not None:
             box_dimensions = [dim * u.angstrom for dim in box_dimensions]
             self.psf.setBox(*box_dimensions)
-        self.positions = read_input_coordinates(crd, self.psf.topology)
+        self.positions = read_input_coordinates(crd, self.mdtraj_topology)
         # process coordinates
         if center_around is not None:
             self.positions = recenter_positions(
