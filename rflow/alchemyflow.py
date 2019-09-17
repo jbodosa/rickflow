@@ -14,11 +14,10 @@ from rflow.reporters.alchemyreporter import AlchemyReporter
 
 class AlchemyFlow(PsfWorkflow):
     """
-    Alchemical free energies of annihilation.
+    Workflow to compute alchemical free energies of annihilation.
     """
     def __init__(
         self,
-            *args,
             lambda_index,
             lambdas_vdw,
             lambdas_elec,
@@ -33,8 +32,7 @@ class AlchemyFlow(PsfWorkflow):
         """
 
         Args:
-            *args:
-            lambda_index: can be the index of a list or the key of a dict
+            lambda_index: can be the index of a list or the key of an ordered dict
             lambdas_vdw: a list
             lambdas_elec: a list
             dcd_file:
@@ -43,11 +41,12 @@ class AlchemyFlow(PsfWorkflow):
             append:
             **kwargs:
         """
-        super(AlchemyFlow, self).__init__(*args, **kwargs)
+        super(AlchemyFlow, self).__init__(**kwargs)
         self.lambda_index = lambda_index
         # convert lists to dicts
         self.lambdas_vdw = lambdas_vdw
         self.lambdas_elec = lambdas_elec
+        assert len(lambdas_vdw) == len(lambdas_elec)
         self._solute_atoms = None
         self.alchemical_state = None
         self.dcd_file = dcd_file.format(lambda_index)

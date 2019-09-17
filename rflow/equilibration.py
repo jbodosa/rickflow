@@ -14,7 +14,7 @@ def equilibrate(
         target_temperature=None,
         minimize=True,
         num_minimization_steps=0,
-        num_high_pressure_steps=20000,
+        num_high_pressure_steps=0,
         start_temperature=200.0 * u.kelvin,
         equilibration=500.*u.picosecond,
         time_step=1.0*u.femtosecond,
@@ -90,15 +90,16 @@ def equilibrate(
             equilibration.minimizeEnergy(maxIterations=num_minimization_steps)
 
         # Phase 1: Equilibration at low temperature and high pressure to prevent blow-ups
-        print("...Starting high-pressure equilibration ({} steps)...".format(num_high_pressure_steps))
-        if barostat is not None:
-            target_pressure = barostat.getDefaultPressure()
-            barostat.setDefaultTemperature(start_temperature)
-            barostat.setDefaultPressure(1000.0 * u.atmosphere)
-            equilibration.context.setParameter(barostat.Temperature(), start_temperature)
-            equilibration.context.setParameter(barostat.Pressure(), 1000.0 * u.atmosphere)
-        integrator.setTemperature(start_temperature)
-        equilibration.step(num_high_pressure_steps)
+        if num_high_pressure_steps:
+            print("...Starting high-pressure equilibration ({} steps)...".format(num_high_pressure_steps))
+            if barostat is not None:
+                target_pressure = barostat.getDefaultPressure()
+                barostat.setDefaultTemperature(start_temperature)
+                barostat.setDefaultPressure(1000.0 * u.atmosphere)
+                equilibration.context.setParameter(barostat.Temperature(), start_temperature)
+                equilibration.context.setParameter(barostat.Pressure(), 1000.0 * u.atmosphere)
+            integrator.setTemperature(start_temperature)
+            equilibration.step(num_high_pressure_steps)
 
         # Phase 2: Gradual heating to target temperature at target pressure
         print("...Starting heating ({} steps)...".format(num_equilibration_steps))
