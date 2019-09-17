@@ -17,17 +17,25 @@ from simtk.openmm import System, Context, LangevinIntegrator, VerletIntegrator, 
 from simtk.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
 from simtk import unit as u
 
-def add_centroid_force(system, custom_centroid_bond_force, platform):
+
+def add_centroid_force(system, custom_centroid_bond_force, platform=None):
     """A wrapper function to acknowledge that the h22 magic variable is not standard OpenMM right now"""
     system.addForce(custom_centroid_bond_force)
     try:
-        Context(system, LangevinIntegrator(
-            500.0, 1. / u.picosecond, 1.0 * u.femtosecond), platform)
+        if platform is None:
+            Context(system, LangevinIntegrator(
+                500.0, 1. / u.picosecond, 1.0 * u.femtosecond))
+        else:
+            Context(system, LangevinIntegrator(
+                500.0, 1. / u.picosecond, 1.0 * u.femtosecond), platform)
     except Exception as e:
         if "Unknown variable 'h22'" in str(e):
             pytest.skip("This version of OpenMM does not support h22 in CustomCentroidBondForce.")
+        elif "CustomCentroidBondForce requires a device that supports 64 bit atomic operations" in str(e):
+            pytest.skip("Test runs only on CUDA")
         else:
             raise e
+
 
 class OpenMMEnergyEvaluator(object):
     """
@@ -168,6 +176,7 @@ def test_partial_com_restraint(force_type):
             abs=1e-4
         )
 
+
 @pytest.mark.parametrize("as_omm",["as_openmm_force", "as_openmm_centroid_force"])
 def test_constant_pull_periodic(as_omm):
     force = 10.0 * u.kilojoule_per_mole / u.nanometer
@@ -176,7 +185,7 @@ def test_constant_pull_periodic(as_omm):
     system = System()
     system.addParticle(mass)
     as_force = getattr(constant_pulling_force, as_omm)
-    system.addForce(as_force([0]))
+    add_centroid_force(system, as_force([0]))
     integrator = VerletIntegrator(1.0 * u.femtosecond)
     context = Context(system, integrator)
     context.setPeriodicBoxVectors(*np.eye(3) * 1.0 * u.nanometer)
@@ -192,7 +201,7 @@ def test_constant_pull_periodic(as_omm):
 
 
 def test_centroid_force():
-    platform = Platform.getPlatformByName("Reference")
+    #platform = Platform.getPlatformByName("Reference")
     system = System()
     for i in range(4):
         system.addParticle(1.0)
@@ -202,10 +211,10 @@ def test_centroid_force():
     force.addGroup([0])
     #force.addPerBondParameter("k")
     force.addBond([0])
-    add_centroid_force(system, force, platform)
+    add_centroid_force(system, force)
     integrator = VerletIntegrator(1.0 * u.femtosecond)
     try:
-        context = Context(system, integrator, platform)
+        context = Context(system, integrator)
         context.setPeriodicBoxVectors(*np.eye(3) * 4.0 * u.nanometer)
         context.setPositions([[0.0, 0.0, float(i)] for i in range(4)])
 
