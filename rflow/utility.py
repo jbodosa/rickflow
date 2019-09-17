@@ -186,10 +186,30 @@ def read_input_coordinates(input, topology=None, frame=-1):
     elif input.endswith(".crd") or input.endswith(".cor"):
         crd = CharmmCrdFile(input)
         pos = crd.positions.value_in_unit(u.nanometer)
+    elif input.endswith(".trj"):
+        traj = md.load_dcd(input, top=topology)
+        pos = traj.xyz[frame, :, :]
     else:
         traj = md.load(input, top=topology)
         pos = traj.xyz[frame, :, :]
     return list(np.array(pos))
+
+
+def read_box_dimensions(input, topology=None, frame=-1):
+    """Same as read_input_coordinates, except for box dimensions."""
+    if isinstance(input, np.ndarray):
+        return None
+    elif isinstance(input, u.Quantity):
+        return None
+    elif input.endswith(".crd") or input.endswith(".cor"):
+        return None
+    elif input.endswith(".trj"):
+        traj = md.load_dcd(input, top=topology)
+        dimensions = traj.unitcell_lengths[frame, :]
+    else:
+        traj = md.load(input, top=topology)
+        dimensions = traj.unitcell_lengths[frame, :]
+    return list(dimensions)
 
 
 def center_of_mass(positions, topology, selection):

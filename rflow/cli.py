@@ -172,7 +172,7 @@ def traj(ctx, first_seq, last_seq, filename_template, top, selection, infer_time
         num_frames_per_trajectory=nframes
     )
     click.echo(f"Found {len(trajectories)} trajectory sequence{'s' if  len(trajectories) != 1 else ''}.")
-    ctx.obj["traj"] = trajectories
+    ctx.obj = trajectories
 
 
 @traj.command()
@@ -191,12 +191,12 @@ def moduli_input(ctx, head, tail, whead, wtail, bilayer_normal, box_prefix="boxs
 
     Example:
     >>> rflow traj -t tests/data/ord2.dcd --top=tests/data/ord+o2.psf
-            moduli-input "resname DPPC and name C2"
+            moduli-input -h "resname DPPC and name C2"
             -t "resname DPPC and name C216"
             -t "resname DPPC and name C316"
 
     """
-    trajectories = ctx.obj["traj"]
+    trajectories = ctx.obj
     head_atoms = []
     tail_atoms = []
     for h in head:

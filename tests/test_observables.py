@@ -163,7 +163,7 @@ def test_energy_decomposition(tmpdir):
         center_around=None,
         work_dir=str(tmpdir)
     )
-    flow.prepareSimulation(LangevinIntegrator(300.0 * u.kelvin, 1/u.picosecond, 1*u.femtosecond))
+    flow.prepare_simulation(LangevinIntegrator(300.0 * u.kelvin, 1/u.picosecond, 1*u.femtosecond))
     flow.run()
 
     # extract energies

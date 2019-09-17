@@ -168,14 +168,15 @@ def test_partial_com_restraint(force_type):
             abs=1e-4
         )
 
-
-def test_constant_pull_periodic():
+@pytest.mark.parametrize("as_omm",["as_openmm_force", "as_openmm_centroid_force"])
+def test_constant_pull_periodic(as_omm):
     force = 10.0 * u.kilojoule_per_mole / u.nanometer
     constant_pulling_force = ConstantPullingForce(force)
     mass = 1.0 * u.amu
     system = System()
     system.addParticle(mass)
-    system.addForce(constant_pulling_force.as_openmm_force([0]))
+    as_force = getattr(constant_pulling_force, as_omm)
+    system.addForce(as_force([0]))
     integrator = VerletIntegrator(1.0 * u.femtosecond)
     context = Context(system, integrator)
     context.setPeriodicBoxVectors(*np.eye(3) * 1.0 * u.nanometer)
