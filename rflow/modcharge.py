@@ -1,6 +1,7 @@
 
 import warnings
 import numpy as np
+from simtk import unit as u
 from simtk.openmm import NonbondedForce, PeriodicTorsionForce, HarmonicBondForce, HarmonicAngleForce
 from rflow.utility import get_force
 
@@ -119,6 +120,6 @@ def scale_subsystem_charges(
                     nonbonded_force.setExceptionParameters(
                         exception, pone, pfour, charges[p1]*charges[p4], sigma, epsilon
                     )
-                    if np.abs(q-charges[p1]*charges[p4]) > 1e-5:
+                    if np.abs(q-charges[p1]*charges[p4]) > 1e-5*u.elementary_charge**2:
                         warnings.warn("Found different")
     return num_added_exceptions, num_modified_exceptions
