@@ -73,6 +73,8 @@ class FreeEnergyCosineSeries(object):
         self.averageBoxHeight = average_box_height
         self.coefficients = coefficients
         self.constantHeight = constant_height
+        self.A_name = f"A{hex(id(self))}"
+        self.z_name = f"z{hex(id(self))}"
 
     def __str__(self):
         """
@@ -84,7 +86,7 @@ class FreeEnergyCosineSeries(object):
 
         """
         result = " + ".join(
-            "A{} * cos( ( z / boxheight ) * 2 * PI * {} )".format(i, i)
+            f"{self.A_name}{i} * cos( ( z / boxheight ) * 2 * PI * {i} )"
             for i in range(len(self.coefficients))
         )
         return result
@@ -131,8 +133,7 @@ class FreeEnergyCosineSeries(object):
         biasing_force.addGlobalParameter("PI", np.pi)
         biasing_force.addGlobalParameter("LZ", self.averageBoxHeight)
         for i in range(len(self.coefficients)):
-            biasing_force.addGlobalParameter("A{}".format(i),
-                                             self.coefficients[i])
+            biasing_force.addGlobalParameter(f"{self.A_name}{i}", self.coefficients[i])
         for particle in particle_ids:
             biasing_force.addParticle(particle)
 
@@ -151,14 +152,14 @@ class FreeEnergyCosineSeries(object):
         forces = []
         for res_nr in range(len(particle_id_list)):
             energy_string = " + ".join(
-                "A{} * cos( z{} * 2 * PI * {} )".format(i, res_nr, i)
+                f"{self.A_name}{i} * cos( {self.z_name}{res_nr} * 2 * PI * {i} )"
                 for i in range(len(self.coefficients))
             )
             biasing_force = CustomCVForce(energy_string)
             biasing_force.addGlobalParameter("PI", np.pi)
             biasing_force.addGlobalParameter("LZ", self.averageBoxHeight)
             for i in range(len(self.coefficients)):
-                biasing_force.addGlobalParameter("A{}".format(i),
+                biasing_force.addGlobalParameter(f"{self.A_name}{i}",
                                                  self.coefficients[i])
 
             #for res_nr in range(len(particle_id_list)):
@@ -166,13 +167,13 @@ class FreeEnergyCosineSeries(object):
             masses = [system.getParticleMass(pid) for pid in residue]
             cv = make_center_of_mass_z_cv(residue, masses, relative=True,
                                           box_height=self.averageBoxHeight)
-            biasing_force.addCollectiveVariable("z{}".format(res_nr), cv)
+            biasing_force.addCollectiveVariable(f"{self.z_name}{res_nr}", cv)
 
             forces.append(biasing_force)
         return forces
 
     def as_openmm_centroid_force(self, particle_id_list):
-        energy_string = str(self).replace("z","z1") + ";boxheight=h22;"
+        energy_string = str(self).replace(" z ",f" z1 ") + ";boxheight=h22;"
         biasing_force = CustomCentroidBondForce(1, energy_string)
         biasing_force.setUsesPeriodicBoundaryConditions(True)
         for molecule in particle_id_list:
@@ -180,7 +181,7 @@ class FreeEnergyCosineSeries(object):
             biasing_force.addBond([i])
         biasing_force.addGlobalParameter("PI", np.pi)
         for i in range(len(self.coefficients)):
-            biasing_force.addGlobalParameter("A{}".format(i), self.coefficients[i])
+            biasing_force.addGlobalParameter(f"{self.A_name}{i}", self.coefficients[i])
         return biasing_force
 
     def as_openmm_vsite_force(self, particle_id_pairs, system, topology,
@@ -283,7 +284,10 @@ class RelativePartialCenterOfMassRestraint(object):
             self.atom_ids = atom_ids
         self.force_constant = force_constant
         self.position = position
-        self.energy_string = "k0 * (zcom - zref)^2"
+        self.k0_name = f"k0{hex(id(self))}"
+        self.zref_name = f"zref{hex(id(self))}"
+        self.zcom_name = f"zcom{hex(id(self))}"
+        self.energy_string = f"{self.k0_name} * ({self.zcom_name} - {self.zref_name})^2"
         self.box_height = box_height_guess
 
     def as_openmm_force(self, system):
@@ -304,24 +308,22 @@ class RelativePartialCenterOfMassRestraint(object):
         biasing_force = CustomCVForce(self.energy_string)
         masses = [system.getParticleMass(atom) for atom in self.atom_ids]
         com_cv = make_center_of_mass_z_cv(self.atom_ids, masses, relative=True, box_height=self.box_height)
-        biasing_force.addCollectiveVariable("zcom", com_cv)
-        biasing_force.addGlobalParameter("zref", self.position)
-        biasing_force.addGlobalParameter("k0", self.force_constant)
+        biasing_force.addCollectiveVariable(self.zcom_name, com_cv)
+        biasing_force.addGlobalParameter(self.zref_name, self.position)
+        biasing_force.addGlobalParameter(self.k0_name, self.force_constant)
         return biasing_force
 
     def as_openmm_centroid_force(self):
-        biasing_force = CustomCentroidBondForce(1, self.energy_string.replace("zcom", "(z1/h22)"))
+        biasing_force = CustomCentroidBondForce(1, self.energy_string.replace(self.zcom_name, "(z1/h22)"))
         groupid = biasing_force.addGroup(self.atom_ids)
         biasing_force.addBond([groupid])
-        biasing_force.addGlobalParameter("zref", self.position)
-        biasing_force.addGlobalParameter("k0", self.force_constant)
+        biasing_force.addGlobalParameter(self.zref_name, self.position)
+        biasing_force.addGlobalParameter(self.k0_name, self.force_constant)
         return biasing_force
 
 
     def __str__(self):
-        string = "{}; k0 = {}, zref={}".format(
-            self.energy_string, self.force_constant, self.position
-        )
+        string = f"{self.energy_string}; {self.k0_name}={self.force_constant}, {self.zref_name}={self.position}"
         return string
 
     def __call__(self, positions, masses, box_height):
@@ -338,13 +340,15 @@ class ConstantPullingForce(object):
     def __init__(self, force, coordinate=2):
         self.force = force
         self.coordinate = coordinate
+        self.parameter_name = f"force{hex(id(self))}"
+        print(self.parameter_name)
 
     def __str__(self):
-        return "- force * {}".format("xyz"[self.coordinate])
+        return "- {} * {}".format(self.parameter_name, "xyz"[self.coordinate])
 
     def as_openmm_force(self, particle_ids=[]):
         biasing_force = CustomExternalForce(str(self))
-        biasing_force.addGlobalParameter("force", self.force)
+        biasing_force.addGlobalParameter(self.parameter_name, self.force)
         for particle in particle_ids:
             biasing_force.addParticle(particle)
         return biasing_force
@@ -353,7 +357,7 @@ class ConstantPullingForce(object):
         biasing_force = CustomCentroidBondForce(1, str(self).replace("z","z1"))
         groupid = biasing_force.addGroup(list(particle_ids))
         biasing_force.addBond([groupid])
-        biasing_force.addGlobalParameter("force", self.force)
+        biasing_force.addGlobalParameter(self.parameter_name, self.force)
         return biasing_force
 
     def __call__(self, z):

@@ -191,6 +191,32 @@ def test_constant_pull_periodic(as_omm):
         assert z == pytest.approx(analytic_solution, abs=0.01)
 
 
+@pytest.mark.parametrize("as_omm",["as_openmm_force", "as_openmm_centroid_force"])
+def test_two_opposite_pull_periodic(as_omm):
+    """Test if two pulling forces dont share their parameter name."""
+    force = 10.0 * u.kilojoule_per_mole / u.nanometer
+    constant_pulling_force = ConstantPullingForce(force)
+    constant_pulling_force2 = ConstantPullingForce(-force)
+    mass = 1.0 * u.amu
+    system = System()
+    system.addParticle(mass)
+    as_force = getattr(constant_pulling_force, as_omm)
+    system.addForce(as_force([0]))
+    as_force = getattr(constant_pulling_force2, as_omm)
+    system.addForce(as_force([0]))
+    integrator = VerletIntegrator(1.0 * u.femtosecond)
+    context = Context(system, integrator)
+    context.setPeriodicBoxVectors(*np.eye(3) * 1.0 * u.nanometer)
+    context.setPositions([[0.0, 0.0, 0.0]])
+    context.setVelocities([[0.0, 0.0, 0.0]])
+    for i in range(1000):
+        integrator.step(1)
+        state = context.getState(getPositions=True)
+        t = state.getTime()
+        z = (state.getPositions()[0][2]).value_in_unit(u.nanometer)
+        analytic_solution = 0
+        assert z == pytest.approx(analytic_solution, abs=0.01)
+
 def test_centroid_force():
     platform = Platform.getPlatformByName("Reference")
     system = System()
