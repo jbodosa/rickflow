@@ -22,3 +22,4 @@ from rflow.biasing import *
 from rflow.integrators import NonequilibriumLangevinIntegrator
 from rflow.rickflow import *
 from rflow.nearest import NearestNeighborAnalysis, NearestNeighborResult
+from rflow.modcharge import scale_subsystem_charges
