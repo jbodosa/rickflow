@@ -36,11 +36,10 @@ def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
     total_mass = np.sum(masses)
     L_str = "(0.75*LZ + periodicdistance(0,0,0,0,0,0.75*LZ))"
     if relative:
-        collective_variable = CustomExternalForce("m/M * z/{}".format(L_str))
+        collective_variable = CustomExternalForce(f"m/{total_mass.value_in_unit(u.dalton)} * z/{L_str}")
         collective_variable.addGlobalParameter("LZ", box_height)
     else:
-        collective_variable = CustomExternalForce("m/M * z")
-    collective_variable.addGlobalParameter("M", total_mass)
+        collective_variable = CustomExternalForce(f"m/{total_mass.value_in_unit(u.dalton)} * z")
     collective_variable.addPerParticleParameter("m")
     for i,particle_id in enumerate(particle_ids):
         collective_variable.addParticle(particle_id, np.array([masses[i]]))
