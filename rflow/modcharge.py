@@ -49,8 +49,6 @@ def scale_subsystem_charges(
 
 
     Notes:
-        This function is built and tested for the CHARMM force field.
-        It expects Lorentz-Berthelot mixing rules and fully-coupled 1-4 interactions.
         The NonbondedForce object must not have any offsets in its per-particle and exception parameters.
     """
 
