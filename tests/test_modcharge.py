@@ -21,10 +21,15 @@ def test_scale_charges():
     # first 27 particles belong to the solute
     subsystem = np.arange(27)
     modified_system = deepcopy(testsystem.system)
-    num_added_exceptions, num_modified_exceptions = scale_subsystem_charges(modified_system, [subsystem], 1.0)
+    num_added_exceptions, num_modified_exceptions = scale_subsystem_charges(
+        modified_system, testsystem.topology, subsystem, 1.0,
+        handle_internal_within=4,
+        handle_external_beyond=4
+    )
 
     # solute has 71 dihedrals that are not bonds or angles
-    assert num_added_exceptions + num_modified_exceptions == 71
+    assert num_modified_exceptions == 57
+    assert num_added_exceptions == 0
 
     # test energies (should be equal for scaling = 1.0)
     e1 = get_energy(testsystem.system, testsystem.positions)
@@ -33,22 +38,19 @@ def test_scale_charges():
 
     # assert that inverting the solute charges changes the energy unfavorably
     modified_system = deepcopy(testsystem.system)
-    scale_subsystem_charges(modified_system, [subsystem], -1)
+    scale_subsystem_charges(modified_system, testsystem.topology, subsystem, -1)
     e3 = get_energy(modified_system, testsystem.positions)
     assert e3 > e1 + 1
 
     # assert that we don't hit any strange behavior at 0
     modified_system = deepcopy(testsystem.system)
-    scale_subsystem_charges(modified_system, [subsystem], 0)
+    scale_subsystem_charges(modified_system, testsystem.topology, subsystem, 0)
     e4 = get_energy(modified_system, testsystem.positions)
 
     modified_system = deepcopy(testsystem.system)
-    scale_subsystem_charges(modified_system, [subsystem], 0.005)
+    scale_subsystem_charges(modified_system, testsystem.topology, subsystem, 0.005)
     e5 = get_energy(modified_system, testsystem.positions)
     assert e4 == pytest.approx(e5, rel=None, abs=1)
 
-    # test multiple subsystems one of which has no torsions (only test API)
-    modified_system = deepcopy(testsystem.system)
-    num_added_exceptions, num_modified_exceptions = scale_subsystem_charges(
-        modified_system, [subsystem, np.arange(27,30)], 0.005)
-    assert num_added_exceptions + num_modified_exceptions == 71
+    # test electrostatic separation
+
