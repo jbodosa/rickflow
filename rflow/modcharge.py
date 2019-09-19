@@ -75,7 +75,6 @@ def scale_subsystem_charges(
         if particle in particle_ids:
             nonbonded_force.setParticleParameters(particle, lambda_electrostatics * charge, sigma, epsilon)
 
-
     # === SCALE INTERNAL ===
 
     # get exceptions to make sure that we don't overwrite anything
@@ -101,13 +100,11 @@ def scale_subsystem_charges(
         # loop over all connected atoms
         for p2, distance in graph.connected(p1):
 
-            if (p1, p2) in handled_pairs:
-                # add each pair only once
+            if distance == 0:
                 continue
 
-            if distance < 3:
-                # assert (p1, p2) in exceptions
-                # no electrostatics for close atoms
+            if (p1, p2) in handled_pairs:
+                # add each pair only once
                 continue
 
             if distance < handle_internal_within:
@@ -123,7 +120,7 @@ def scale_subsystem_charges(
                 # alpha = 0 at distance=handle_internal_within-1
                 internal_lambda = alpha * lambda_electrostatics + (1 - alpha) * 1.0
 
-            if distance == 3:
+            if distance <= 3:
                 # see if this should be added as an exception
                 if (p1,p2) in exceptions:
                     exception_id = exceptions[(p1,p2)]
@@ -158,6 +155,7 @@ def scale_subsystem_charges(
             num_added_interactions += 1
             handled_pairs.add((p1, p2))
             handled_pairs.add((p2, p1))
+    system.addForce(internal_electrostatic_force)
 
     return num_added_interactions, num_modified_exceptions
 

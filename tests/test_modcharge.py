@@ -52,5 +52,50 @@ def test_scale_charges():
     e5 = get_energy(modified_system, testsystem.positions)
     assert e4 == pytest.approx(e5, rel=None, abs=1)
 
-    # test electrostatic separation
+
+@pytest.mark.parametrize("create_exceptions", [True, False])
+def test_internal_electrostatic_correction(create_exceptions):
+    from simtk.openmm import System, NonbondedForce
+    from simtk.openmm.app import Topology, Chain, Residue, Atom
+    system = System()
+    topology = Topology()
+    chain = topology.addChain(0)
+    residue = topology.addResidue("R", chain)
+    nonbonded_force = NonbondedForce()
+    atoms = []
+    bonds = []
+    for i in range(6):
+        system.addParticle(1.0)
+        nonbonded_force.addParticle(1.0 if i % 2 == 0 else -1.0, 1.0, 0.0)
+        atoms.append(topology.addAtom(f"p{i}", element=None, residue=residue))
+    for i in range(5):
+        topology.addBond(atoms[i],atoms[i+1])
+        bonds.append([i, i+1])
+    if create_exceptions:
+        nonbonded_force.createExceptionsFromBonds(bonds, 1, 1)
+    system.addForce(nonbonded_force)
+    positions = np.array([[i*0.01, 0.0, 0.0] for i in range(6)])
+    energy1 = get_energy(system, positions=positions)
+
+    # check that scaling charges has no effect (because all interactions are internal)
+    modified_system = deepcopy(system)
+    scale_subsystem_charges(modified_system, topology, range(6), 0.1)
+    energy2 = get_energy(modified_system, positions=positions)
+    assert energy1 == pytest.approx(energy2, rel=None, abs=1e-2)
+
+    # check that scaling charges has no effect (all interactions are bonded and handled internally within 10)
+    modified_system = deepcopy(system)
+    scale_subsystem_charges(modified_system, topology, range(2), 0.1)
+    energy3 = get_energy(modified_system, positions)
+    assert energy1 == pytest.approx(energy3, rel=None, abs=1e-2)
+
+    # check that scaling charges has an effect (1-5 and 1-6 are handled hybrid; linearly scaled)
+    modified_system = deepcopy(system)
+    scale_subsystem_charges(modified_system, topology, range(2), 0.1, handle_internal_within=4)
+    energy4 = get_energy(modified_system, positions)
+    assert energy1 == pytest.approx(energy2, rel=None, abs=1e-2)
+    assert abs(energy1 - energy4) > 1
+
+
+
 
