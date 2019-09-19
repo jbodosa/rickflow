@@ -210,9 +210,9 @@ def test_two_opposite_pull_periodic(as_omm):
     system = System()
     system.addParticle(mass)
     as_force = getattr(constant_pulling_force, as_omm)
-    system.addForce(as_force([0]))
+    add_centroid_force(system, as_force([0]))
     as_force = getattr(constant_pulling_force2, as_omm)
-    system.addForce(as_force([0]))
+    add_centroid_force(system, as_force([0]))
     integrator = VerletIntegrator(1.0 * u.femtosecond)
     context = Context(system, integrator)
     context.setPeriodicBoxVectors(*np.eye(3) * 1.0 * u.nanometer)
@@ -221,7 +221,6 @@ def test_two_opposite_pull_periodic(as_omm):
     for i in range(1000):
         integrator.step(1)
         state = context.getState(getPositions=True)
-        t = state.getTime()
         z = (state.getPositions()[0][2]).value_in_unit(u.nanometer)
         analytic_solution = 0
         assert z == pytest.approx(analytic_solution, abs=0.01)
