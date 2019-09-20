@@ -36,7 +36,8 @@ def scale_subsystem_charges(
 
 
     Returns:
-        num_added_exceptions (int): The number of 1-4 exceptions that have been added
+        num_added_interactions (int): The number of internal interactions that have been added
+            to make up for the scaled charges.
         num_modified_exceptions (int): The number of 1-4 exceptions that were touched.
 
     Examples:

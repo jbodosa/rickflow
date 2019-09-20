@@ -26,9 +26,6 @@ def test_scale_charges():
         handle_internal_within=4,
         handle_external_beyond=4
     )
-
-    # solute has 71 dihedrals that are not bonds or angles
-    assert num_modified_exceptions == 57
     assert num_added_exceptions == 0
 
     # test energies (should be equal for scaling = 1.0)
