@@ -90,10 +90,10 @@ def equilibrate(
             equilibration.minimizeEnergy(maxIterations=num_minimization_steps)
 
         # Phase 1: Equilibration at low temperature and high pressure to prevent blow-ups
+        target_pressure = barostat.getDefaultPressure() if barostat is not None else None
         if num_high_pressure_steps:
             print("...Starting high-pressure equilibration ({} steps)...".format(num_high_pressure_steps))
             if barostat is not None:
-                target_pressure = barostat.getDefaultPressure()
                 barostat.setDefaultTemperature(start_temperature)
                 barostat.setDefaultPressure(1000.0 * u.atmosphere)
                 equilibration.context.setParameter(barostat.Temperature(), start_temperature)
