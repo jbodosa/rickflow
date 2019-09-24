@@ -1,0 +1,36 @@
+
+toppar:
+  - ../../tests/data/toppar/top_all36_lipid.rtf
+  - ../../tests/data/toppar/par_all36_lipid.prm
+  - ../../tests/data/toppar/toppar_water_ions.str
+psf: ../../tests/data/water.psf
+cutoff: 1.0
+switch: 0.8
+n_iterations: 1000000
+storage_file: result.nc
+
+thermodynamic_states:
+  - {temperature: 300, pressure: 1.0, charge_scaling: 1.0 }
+  - {temperature: 300, pressure: 1.0, charge_scaling: 1.0 }
+  - {temperature: 300, pressure: 1.0, charge_scaling: 1.0 }
+
+thermodynamic_state_settings:
+  charge_scaling_selection: peptides
+  charge_scaling_handle_internal_within: 1000
+  charge_scaling_handle_external_beyond: 1000
+
+sampler_states:
+  - coordinates: ../../tests/data/water.crd
+    box_dimensions: [25.1984, 25.1984, 25.1984]
+    center_around: water
+
+mcmc_move:
+  timestep: 0.001  # ps
+  n_steps: 10     # number of steps between exchanges
+
+selection:
+  walpA: "resid < 19"
+  walpB: "resid >= 19 and resid < 38"
+  peptides: "resid < 38"
+  membrane: "resname DOPC"
+  water: "water"
