@@ -52,6 +52,7 @@ class RickFlow(PsfWorkflow):
                  initialize_velocities=True,
                  center_around=None,
                  analysis_mode=False,
+                 precision="mixed",
                  **kwargs
                  ):
         """
@@ -87,9 +88,11 @@ class RickFlow(PsfWorkflow):
                 If None, center the system around all non-TIP3Ps.
             analysis_mode (bool): If True, create the workflow in its initial state without
                 setting up the directory structure or requiring a GPU.
+            precision (str): "mixed", "single", or "double". Only active on CUDA platform, default: mixed.
         """
         self.work_dir = work_dir
         self.gpu_id = gpu_id
+        self.precision = precision
         self.tmp_output_dir = tmp_output_dir
         self.dcd_output_interval = dcd_output_interval
         self.table_output_interval = table_output_interval
@@ -232,7 +235,8 @@ class RickFlow(PsfWorkflow):
                 dcd_output_interval=0 if self.analysis_mode else self.dcd_output_interval,
                 dcd_output_file=RickFlow._dcd(self.next_seqno),
                 table_output_interval=0 if self.analysis_mode else self.table_output_interval,
-                table_output_file=RickFlow._out(self.next_seqno)
+                table_output_file=RickFlow._out(self.next_seqno),
+                precision=self.precision
             )
 
     def initialize_state(self):

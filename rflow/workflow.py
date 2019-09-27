@@ -129,7 +129,8 @@ class PsfWorkflow(object):
             dcd_output_interval=0,
             dcd_output_file="dyn.dcd",
             table_output_interval=0,
-            table_output_file="dyn.txt"
+            table_output_file="dyn.txt",
+            precision="mixed"
     ):
         """
         Initialize simulation object by passing an integrator and a barostat.
@@ -140,7 +141,7 @@ class PsfWorkflow(object):
         """
         if barostat:
             self.system.addForce(barostat)
-        platform, platform_properties = get_platform(gpu_id)
+        platform, platform_properties = get_platform(gpu_id, precision)
         self._simulation = Simulation(
             self.topology,
             self.system,
@@ -157,7 +158,8 @@ class PsfWorkflow(object):
                 table_output_file,
                 table_output_interval,
                 step=True, time=True,
-                potentialEnergy=True, temperature=True,
+                potentialEnergy=True, kineticEnergy=True,
+                totalEnergy=True, temperature=True,
                 volume=True, density=True, speed=True
             ))
         print("#Running on ", self.context.getPlatform().getName())
