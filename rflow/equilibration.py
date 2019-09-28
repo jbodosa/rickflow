@@ -121,7 +121,7 @@ def equilibrate(
         integrator.setTemperature(target_temperature)
         if barostat is not None:
             equilibration.context.setParameter(barostat.Temperature(), target_temperature)
-            barostat.setDefaultTemperature(temperature)
+            barostat.setDefaultTemperature(target_temperature)
         equilibration.step(num_equilibration_steps)
         print("Equilibration done.")
         if restart_file is not None:
