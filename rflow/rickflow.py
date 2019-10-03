@@ -32,7 +32,7 @@ class RickFlow(PsfWorkflow):
     _dcd = lambda i: os.path.join(RickFlow._trjdir, f"dyn{i}.dcd")
     _out = lambda i: os.path.join(RickFlow._outdir, f"out{i}.txt")
     _xml = lambda i: os.path.join(RickFlow._resdir, f"state{i}.xml")
-    _chk = lambda i: os.path.join(RickFlow._resdir, f"checkpoint{i}.chk")
+    #_chk = lambda i: os.path.join(RickFlow._resdir, f"checkpoint{i}.chk")
     _nxt = "next.seqno"
     _lst = "last.seqno"
 
@@ -47,7 +47,6 @@ class RickFlow(PsfWorkflow):
                  dcd_output_interval=1000,
                  table_output_interval=1000,
                  steps_per_sequence=1000000,
-                 use_only_xml_restarts=False,
                  misc_psf_create_system_kwargs={},
                  initialize_velocities=True,
                  center_around=None,
@@ -82,8 +81,6 @@ class RickFlow(PsfWorkflow):
             steps_per_sequence (int): Number of time steps per job.
             misc_psf_create_system_kwargs (dict): Provides an interface for the user to modify keyword
                 arguments of the CharmmPsfFile.createSystem() call.
-            use_only_xml_restarts (bool): If True, always use state files for restarts.
-                If False, try checkpoint file first.
             center_around (selection or None): Center initial system around the selection.
                 If None, center the system around all non-TIP3Ps.
             analysis_mode (bool): If True, create the workflow in its initial state without
@@ -97,7 +94,6 @@ class RickFlow(PsfWorkflow):
         self.dcd_output_interval = dcd_output_interval
         self.table_output_interval = table_output_interval
         self.steps_per_sequence = steps_per_sequence
-        self.use_only_xml_restarts = use_only_xml_restarts
         self.vdw_switching = vdw_switching
         self.analysis_mode = analysis_mode
         self.tmp_output_dir = tmp_output_dir
@@ -111,6 +107,13 @@ class RickFlow(PsfWorkflow):
             )
             self.vdw_switching = "charmm-gui" if kwargs['use_vdw_force_switch'] else "openmm"
             kwargs.pop('use_vdw_force_switch')
+        if 'use_only_xml_restarts' in kwargs:
+            warnings.warn(
+                "use_only_xml_restarts is deprecated and will be removed in future versions. "
+                "Only xml restart files are generated due to instability "
+                "issues with the checkpoint files. "
+            )
+            kwargs.pop("use_only_xml_restarts")
         assert len(kwargs) == 0, "Keyword arguments not understood: {}".format(kwargs)
 
         if not self.analysis_mode:
@@ -252,19 +255,19 @@ class RickFlow(PsfWorkflow):
                 )
             else:
                 print("Attempting restart...")
-                checkpoint_file = RickFlow._chk(self.next_seqno-1)
+                #checkpoint_file = RickFlow._chk(self.next_seqno-1)
                 state_file = RickFlow._xml(self.next_seqno-1)
-                if not self.use_only_xml_restarts:
-                    try:
-                        self.simulation.loadCheckpoint(checkpoint_file)
-                        print("Restarting from checkpoint file {}.".format(checkpoint_file))
-                    except:
-                        print("    ...could not read from checkpoint file...")
-                        self.simulation.loadState(state_file)
-                        print("Restarting from state file {}.".format(state_file))
-                else:
-                    self.simulation.loadState(state_file)
-                    print("Restarting from state file {}.".format(state_file))
+                # if not self.use_only_xml_restarts:          # to be removed
+                #     try:
+                #         self.simulation.loadCheckpoint(checkpoint_file)
+                #         print("Restarting from checkpoint file {}.".format(checkpoint_file))
+                #     except:
+                #         print("    ...could not read from checkpoint file...")
+                #         self.simulation.loadState(state_file)
+                #         print("Restarting from state file {}.".format(state_file))
+                # else:
+                self.simulation.loadState(state_file)
+                print("Restarting from state file {}.".format(state_file))
 
                 # read time and timestep
                 last_step, last_time = self.previous_step
@@ -288,15 +291,15 @@ class RickFlow(PsfWorkflow):
 
             # save checkpoints
             self.simulation.saveState(RickFlow._xml(self.next_seqno))
-            with open(RickFlow._chk(self.next_seqno), 'wb') as f:
-                f.write(self.simulation.context.createCheckpoint())
+            #with open(RickFlow._chk(self.next_seqno), 'wb') as f:
+            #    f.write(self.simulation.context.createCheckpoint())
 
             # if required, copy temporary files over
             if self.tmp_output_dir is not None:
                 shutil.copy(RickFlow._dcd(self.next_seqno), os.path.join(self.work_dir, RickFlow._trjdir))
                 shutil.copy(RickFlow._out(self.next_seqno), os.path.join(self.work_dir, RickFlow._outdir))
                 shutil.copy(RickFlow._xml(self.next_seqno), os.path.join(self.work_dir, RickFlow._resdir))
-                shutil.copy(RickFlow._chk(self.next_seqno), os.path.join(self.work_dir, RickFlow._resdir))
+                #shutil.copy(RickFlow._chk(self.next_seqno), os.path.join(self.work_dir, RickFlow._resdir))
 
         self.next_seqno = self.next_seqno + 1
         if self.next_seqno > self.last_seqno:
