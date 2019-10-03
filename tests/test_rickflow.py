@@ -60,8 +60,7 @@ def run_and_restart(tmpdir_factory, request):
         table_output_interval=10,
         dcd_output_interval=10,
         center_around=None,
-        work_dir=str(tmpdir),
-        use_only_xml_restarts=True
+        work_dir=str(tmpdir)
     )
     barostat = MonteCarloBarostat(1.0*u.atmosphere, 200.0*u.kelvin, 25) if request.param else None
     rf.prepare_simulation(
