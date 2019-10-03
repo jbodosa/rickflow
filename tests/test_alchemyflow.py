@@ -1,5 +1,6 @@
 
 import os
+import shutil
 import pytest
 import numpy as np
 
@@ -9,6 +10,7 @@ from simtk.openmm import LangevinIntegrator
 from simtk.openmm.app import NoCutoff, StateDataReporter
 
 from rflow.alchemyflow import AlchemyFlow
+from rflow.reporters.alchemyreporter import FreeEnergyDifference
 from rflow.utility import abspath, CWD
 
 import mdtraj as md
@@ -56,3 +58,24 @@ def test_alchemyflow(tmpdir):
             recalculated.append(flow.context.getState(getEnergy=True).getPotentialEnergy()/kT)
         assert energies[:,1] == pytest.approx(potential, abs=1e-4)
         assert np.array(recalculated) == pytest.approx(potential, rel=None, abs=1e-2)
+
+
+def test_free_energy_difference(tmpdir):
+    shutil.copytree(abspath("./data/alchemydata/"), str(tmpdir/"alchemydata"))
+    file_template = str(tmpdir/"alchemydata/ener.{}.txt")
+    n_lambdas = 13
+    delta_g = FreeEnergyDifference(file_template, n_lambdas)
+    delta_g._save_summary_file()
+    # saving and loading
+    with open(delta_g.summary_file, "r") as fp:
+        read1 = fp.read()
+    delta_g._load_summary_file()
+    delta_g._save_summary_file()
+    with open(delta_g.summary_file, "r") as fp:
+        read2 = fp.read()
+    assert read1 == read2
+    # properties
+    assert delta_g.value == pytest.approx(delta_g.value_elec + delta_g.value_vdw)
+    assert delta_g.error == pytest.approx(delta_g.error_elec + delta_g.error_vdw, rel=0.1, abs=None)
+    assert delta_g.mbar_error == pytest.approx(delta_g.mbar_error_elec + delta_g.mbar_error_vdw, rel=0.3, abs=None)
+
