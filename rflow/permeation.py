@@ -263,7 +263,7 @@ class PermeationEventCounter(object):
 
                         event["type"] = "crossing"
                         if self.framenr_of_last_seen_in_functional_bin[last_w_bin][particle] != -999999:
-                            event["crossing_time_nframes"] = from_w_bin_time
+                            event["in_membrane_time_nframes"] = from_w_bin_time
                 else:
                     assert z_digitized[i][particle] == 3
                     # entry
@@ -480,6 +480,162 @@ class PermeationEventCounter(object):
 
         return perm(num_events), perm(min_events), perm(max_events)
 
+
+class PermeationEventCounterWithoutBuffer:
+    num_bins = 4
+    membrane_bins = [1, 2]
+    water_bins = [0, 3]
+
+    def __init__(
+            self,
+            solute_ids,
+            dividing_surface,
+            membrane=None,
+            initialize_all_permeants=True
+    ):
+        self.solute_ids = solute_ids
+        self.membrane = membrane
+        self.initialize_all_permeants = initialize_all_permeants
+        self.bins = [0.5-dividing_surface, 0.5, 0.5+dividing_surface]
+        self.num_bins = 4
+        self.last_visited = -2*np.ones((len(self.solute_ids), self.num_bins), dtype=int)
+        self.previous_digitized = None
+        self.previous_last_visited = None
+        self.startframe = 0
+        self.events = []
+
+    def __call__(self, trajectory):
+        indices = np.arange(len(self.solute_ids))
+        digitized = self._digitize(trajectory)
+
+        # initialize flags for all permeants
+        if self.startframe == 0:
+            if self.initialize_all_permeants:
+                self.last_visited[np.where(digitized[0] == 1), 0] = -1
+                self.last_visited[np.where(digitized[0] == 2), 3] = -1
+
+        # count events
+        for i in range(trajectory.n_frames):
+
+            # update last visited
+            frame = self.startframe + i
+            self.last_visited[indices, digitized[i]] = frame
+
+            if self.previous_digitized is not None:
+                # -- jumps over a bin --
+                particles_with_jumps = np.where(
+                    np.mod(self.previous_digitized - digitized[i], self.num_bins) == 2
+                )[0]
+                for particle in particles_with_jumps:
+                    warn(
+                        f"Jump over bin in frame {frame}. Particle {self.solute_ids[particle]}: "
+                        f"{self.previous_digitized[particle]}->{digitized[i][particle]}"
+                    )
+
+                # -- actual transitions --
+                # seave out most particles for numerical efficiency
+                particles_with_transition = np.where(
+                    np.logical_and(
+                        np.isin(np.mod(self.previous_digitized - digitized[i], self.num_bins), [1, 3]),
+                        np.isin(self.previous_digitized, self.membrane_bins)
+                    )
+                )[0]
+                particles_with_events = {
+                    **{i: "entry" for i in particles_with_transition[
+                        np.where(self._is_entry(particles_with_transition))[0]
+                    ]},
+                    **{i: "crossing" for i in particles_with_transition[
+                        np.where(self._is_crossing(particles_with_transition))[0]
+                    ]},
+                    **{i: "rebound" for i in particles_with_transition[
+                        np.where(self._is_rebound(particles_with_transition))[0]
+                    ]},
+                }
+                for particle, event_type in particles_with_events.items():
+                    # -- make event dictionary --
+                    last_water = np.argmax(self.previous_last_visited[particle, [0,3]])*3
+                    last_time_water = self.previous_last_visited[particle, last_water]
+                    atom_id = self.solute_ids[particle]
+                    event = {
+                        "event_id": len(self.events),
+                        "atom": atom_id,
+                        "type": event_type,
+                        "frame": frame,
+                        "from_water": last_water,
+                        f"{event_type}_time_nframes": (
+                            None if last_time_water < 0 else frame - 1 - last_time_water
+                            # the -1 accounts for the average time spend in the source and target bin
+                            # before and after crossing the boundary
+                        )
+                    }
+                    if event_type in ["rebound", "crossing"]:
+                        # -- get corresponding entry event and exit time --
+                        for other_event in reversed(self.events):
+                            if other_event["type"] == "entry" and other_event["atom"] == atom_id:
+                                event["corresponding_entry_id"] = other_event["event_id"]
+                                break
+                        otherside_membrane_bin = ( digitized[i][particle] + 2 ) % 4
+                        last_otherside = self.previous_last_visited[particle, otherside_membrane_bin]
+                        event["exit_time_nframes"] = (
+                            None if last_otherside is None else frame - 1 - last_otherside
+                            # the -1 accounts for the average time spend in the source and target bin
+                            # before and after crossing the boundary
+                        )
+
+                    self.events += [event]
+
+            self.previous_digitized = np.copy(digitized[i])
+            self.previous_last_visited = np.copy(self.last_visited)
+        self.startframe += trajectory.n_frames
+
+    # ----- PRIVATE METHODS ------
+
+    def _digitize(self, trajectory):
+        z_normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
+        return np.digitize(z_normalized, self.bins)
+
+    @staticmethod
+    def _is_in_order(array, order):
+        in_order = np.ones(array.shape[:-1], dtype=bool)
+        for i in range(len(order)-1):
+            in_order = np.logical_and(in_order, np.less(array[...,order[i]], array[...,order[i+1]]))
+        return in_order
+
+    def _is_entry(self, particles_with_transition):
+        return np.logical_or(
+            np.logical_and(
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [2, 0, 1]),
+                self._is_in_order(self.last_visited[particles_with_transition], [0, 1, 2])
+            ),
+            np.logical_and(
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [1, 3, 2]),
+                self._is_in_order(self.last_visited[particles_with_transition], [3, 2, 1])
+            )
+        )
+
+    def _is_crossing(self, particles_with_transition):
+        return np.logical_or(
+            np.logical_and(
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [0, 1, 2]),
+                self._is_in_order(self.last_visited[particles_with_transition], [0, 1, 2, 3]),
+            ),
+            np.logical_and(
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [3, 2, 1]),
+                self._is_in_order(self.last_visited[particles_with_transition], [3, 2, 1, 0]),
+            )
+        )
+
+    def _is_rebound(self, particles_with_transition):
+        return np.logical_or(
+            np.logical_and(
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [3, 0, 2, 1]),
+                self._is_in_order(self.last_visited[particles_with_transition], [2, 1, 0]),
+            ),
+            np.logical_and(
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [0, 3, 1, 2]),
+                self._is_in_order(self.last_visited[particles_with_transition], [1, 2, 3]),
+            )
+        )
 
 class Distribution(rflow.observables.Distribution):
     def __init__(self, *args, **kwargs):

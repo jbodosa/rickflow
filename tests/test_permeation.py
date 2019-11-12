@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 
-from rflow import TransitionCounter, PermeationEventCounter, Distribution, RickFlowException
+from rflow import (
+    TransitionCounter, PermeationEventCounter, Distribution, RickFlowException,
+    PermeationEventCounterWithoutBuffer
+)
 
-import os
 import pytest
 import warnings
 import numpy as np
+
+import mdtraj as md
 
 
 def test_transitions(whex_iterator):
@@ -114,3 +118,92 @@ def test_permeability2():
     assert p > mi
     assert ma > p
 
+
+class MockTrajectory:
+    def __init__(self, z):
+        # allow 1d and 2d input
+        if len(z.shape) == 1: z = z[None,:] #.reshape((1, z.shape[0]))
+        assert len(z.shape) == 2
+        self.n_atoms = z.shape[0]
+        self.n_frames = z.shape[1]
+        z = np.transpose(z)[:,:,None]
+        x = np.random.random((self.n_frames,self.n_atoms,1))
+        y = np.random.random((self.n_frames,self.n_atoms,1))
+        xyz = np.reshape(np.stack([x, y, z], axis=-1), (self.n_frames, self.n_atoms, 3))
+        assert len(xyz.shape) == 3
+        self.xyz = xyz
+        assert xyz.shape == (self.n_frames, self.n_atoms, 3)
+        self.unitcell_lengths = np.ones((self.n_frames,3))
+        self.time = np.arange(self.n_frames)
+        self.topology = md.Topology()
+        chain = self.topology.add_chain()
+        for i in range(self.n_atoms):
+            residue = self.topology.add_residue("H", chain)
+            self.topology.add_atom("H", md.element.hydrogen, residue)
+
+
+def test_counter2_noevent():
+    # bouncing back and forth, barely not crossing the center
+    z = np.array([0.1, 0.49, 0.1, 0.8, 0.5001, 0.9, 0.2, 0.499])
+    counter = PermeationEventCounterWithoutBuffer([0], 0.25)
+    counter(MockTrajectory(z))
+    assert not counter.events
+
+
+def test_counter2_entry():
+    z = np.array([
+        np.interp(np.arange(21), [0, 20], [0.24999, 0.4999]), # particle 0 not entering
+        np.interp(np.arange(21), [0, 20], [0.24999, 0.5001]), # particle 1 entering from one side
+        np.interp(np.arange(21), [0, 20], [0.75001, 0.4999])  # particle 2 entering from other side
+    ])
+    counter = PermeationEventCounterWithoutBuffer([0, 1, 2], 0.25)
+    counter(MockTrajectory(z))
+    assert counter.events == [
+        {'event_id': 0, 'atom': 1, 'type': 'entry', 'frame': 20,
+            'from_water': 0, 'entry_time_nframes': 19},
+        {'event_id': 1, 'atom': 2, 'type': 'entry', 'frame': 20,
+            'from_water': 3, 'entry_time_nframes': 19},
+    ]
+
+
+def test_counter2_crossing():
+    z = np.array([
+        [0.22, 0.33, 0.44, 0.55, 0.44, 0.33, 0.44, 0.55, 0.66, 0.77],  # crossing from one side
+        [0.77, 0.66, 0.55, 0.44, 0.55, 0.66, 0.55, 0.44, 0.33, 0.22],  # crossing from other side
+    ])
+    counter = PermeationEventCounterWithoutBuffer([0, 1], 0.25)
+    counter(MockTrajectory(z))
+    print(counter.events)
+    assert counter.events == [
+        {'event_id': 0, 'atom': 0, 'type': 'entry', 'frame': 3,
+            'from_water': 0, 'entry_time_nframes': 2},
+        {'event_id': 1, 'atom': 1, 'type': 'entry', 'frame': 3,
+            'from_water': 3, 'entry_time_nframes': 2},
+        {'event_id': 2, 'atom': 0, 'type': 'crossing', 'frame': 9,
+            'from_water': 0, 'crossing_time_nframes': 8,
+            'corresponding_entry_id': 0, 'exit_time_nframes': 2},
+        {'event_id': 3, 'atom': 1, 'type': 'crossing', 'frame': 9,
+            'from_water': 3, 'crossing_time_nframes': 8,
+            'corresponding_entry_id': 1, 'exit_time_nframes': 2}
+    ]
+
+
+def test_counter2_rebound():
+    z = np.array([
+        [0.22,0.33,0.44,0.55,0.44,0.33,0.22],
+        [0.77,0.66,0.55,0.44,0.55,0.66,0.77],
+    ])
+    counter = PermeationEventCounterWithoutBuffer([0, 1], 0.25)
+    counter(MockTrajectory(z))
+    assert counter.events == [
+        {'event_id': 0, 'atom': 0, 'type': 'entry', 'frame': 3,
+            'from_water': 0, 'entry_time_nframes': 2},
+        {'event_id': 1, 'atom': 1, 'type': 'entry', 'frame': 3,
+            'from_water': 3, 'entry_time_nframes': 2},
+        {'event_id': 2, 'atom': 0, 'type': 'rebound', 'frame': 6,
+            'from_water': 0, 'rebound_time_nframes': 5,
+            'corresponding_entry_id': 0, 'exit_time_nframes': 2},
+        {'event_id': 3, 'atom': 1, 'type': 'rebound', 'frame': 6,
+            'from_water': 3, 'rebound_time_nframes': 5,
+            'corresponding_entry_id': 1, 'exit_time_nframes': 2}
+   ]
