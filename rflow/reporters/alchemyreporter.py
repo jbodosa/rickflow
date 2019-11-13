@@ -112,13 +112,6 @@ class AlchemyReporter(object):
 class FreeEnergyDifference:
     """
     Calculate the free energy differences between all lambda states.
-
-    Args:
-        phase (GasPhase or SolutionPhase): The phase from which to extract the free energy differences.
-        force_update (bool):
-
-    Parameters:
-        pass
     """
     def __init__(self, file_template, n_lambdas, force_update=False, unit=None, temperature=None, n_blocks=5):
         self.file_template = file_template
@@ -128,7 +121,7 @@ class FreeEnergyDifference:
             self.unit_factor = 1.0
         else:
             kT = (temperature * u.constants.BOLTZMANN_CONSTANT_kB * u.constants.AVOGADRO_CONSTANT_NA)
-            self.unit_factor = 1. / kT.value_in_unit(unit)
+            self.unit_factor = kT.value_in_unit(unit)
 
         # energies and errors between all states; those are in units of kT
         self.result_matrix = np.zeros([n_lambdas, n_lambdas], dtype=np.float)
