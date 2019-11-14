@@ -738,7 +738,6 @@ class RegionCrossingCounter:
                 )
                 particle_with_events = np.where(is_event)[0]
                 for particle in particle_with_events:
-                    print(self.last_visited)
                     event = {
                         "atom": self.solute_ids[particle],
                         "frame": frame,
