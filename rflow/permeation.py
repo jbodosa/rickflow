@@ -519,7 +519,7 @@ class PermeationEventCounterWithoutBuffer:
 
             # update last visited
             frame = self.startframe + i
-            self.last_visited[indices, digitized[i]] = frame
+            self.last_visited[(indices, digitized[i])] = frame
 
             if self.previous_digitized is not None:
                 # -- jumps over a bin --
@@ -529,11 +529,32 @@ class PermeationEventCounterWithoutBuffer:
                 for particle in particles_with_jumps:
                     warn(
                         f"Jump over bin in frame {frame}. Particle {self.solute_ids[particle]}: "
-                        f"{self.previous_digitized[particle]}->{digitized[i][particle]}"
+                        f"{self.previous_digitized[particle]}->{digitized[i][particle]}. Continuing "
+                        f"with the assumption that it jumped over a water bin."
                     )
+                    involved_bins = {self.previous_digitized[particle], digitized[i][particle]}
+                    assert involved_bins in [{0,2}, {1,3}]
+                    # assume the jump was over a water bin,
+                    # since permeation through the membrane is usually much slower
+                    bin_jumped_over = 0 if involved_bins == {1,3} else 3
+                    # if the jump was an exit, restrain the jump to this bin to make sure that crossings get counted.
+                    # This has no consequence in the following steps
+                    # unless another jump over membrane bin occurs in the next step (in that case, the frame spacing
+                    # is way too wide anyway).
+                    if digitized[i][particle] in {0,3}:
+                        self.last_visited[particle, bin_jumped_over] = frame
+                        self.last_visited[particle, digitized[i, particle]] = -1
+                        digitized[i, particle] = bin_jumped_over
+                    else:
+                        # if the jump was an entry, rewrite the history to make sure that the crossing/rebound
+                        # is recognized when the particle exits
+                        self.last_visited[particle, bin_jumped_over] = frame - 1
+                        self.last_visited[particle, self.previous_digitized[particle]] = frame - 2
+                        self.previous_digitized[particle] = bin_jumped_over
 
-                # -- actual transitions --
-                # seave out most particles for numerical efficiency
+
+                # -- meaningful transitions --
+                # first seave out most particles for efficiency
                 particles_with_transition = np.where(
                     np.logical_and(
                         np.isin(np.mod(self.previous_digitized - digitized[i], self.num_bins), [1, 3]),
@@ -551,6 +572,8 @@ class PermeationEventCounterWithoutBuffer:
                         np.where(self._is_rebound(particles_with_transition))[0]
                     ]},
                 }
+
+                # - handle events --
                 for particle, event_type in particles_with_events.items():
                     # -- make event dictionary --
                     last_water = np.argmax(self.previous_last_visited[particle, [0,3]])*3
@@ -636,6 +659,102 @@ class PermeationEventCounterWithoutBuffer:
                 self._is_in_order(self.last_visited[particles_with_transition], [1, 2, 3]),
             )
         )
+
+
+class RegionCrossingCounter:
+    def __init__(self, solute_ids, lower_boundary, upper_boundary, membrane=None, initialize_permeants_from=None):
+        """
+
+        Args:
+            solute_ids:
+            lower_boundary:
+            upper_boundary:
+            membrane:
+            initialize_permeants_from: can be None, "upper", and "lower". If None, don't impose a history on the
+                particles inside the regions. If "lower", all are assumed to have entered from the lower boundary.
+                If "upper", all are assumed to have entered from the upper boundary.
+        """
+        assert upper_boundary > lower_boundary
+        assert len(solute_ids) > 0
+        assert initialize_permeants_from in [None, "upper", "lower"]
+        self.solute_ids = solute_ids
+        self.lower_boundary = lower_boundary
+        self.upper_boundary = upper_boundary
+        self.membrane = membrane
+        self.initialize_permeants_from = initialize_permeants_from
+        self.opposite_center = ((self.lower_boundary + self.upper_boundary)/2 + 0.5) % 1.0
+        # make sure that the "opposite center" is not in the region
+        assert self.opposite_center < lower_boundary or self.opposite_center > upper_boundary
+        self.last_visited = -2*np.ones((len(self.solute_ids), 3), dtype=int)
+        self.previous_digitized = None
+        self.startframe = 0
+        self.num_transitions = np.zeros((3,3), dtype=int)
+        self.events = []
+
+    def _digitize(self, trajectory):
+        """
+        bin 0: below region
+        bin 1: in region
+        bin 2: above region
+        """
+        normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
+        if self.opposite_center > self.upper_boundary:
+            digitized = np.digitize(normalized, [self.lower_boundary, self.upper_boundary, self.opposite_center])
+            digitized[np.where(digitized == 3)] = 0
+        elif self.opposite_center < self.lower_boundary:
+            digitized = np.digitize(normalized, [self.opposite_center, self.lower_boundary, self.upper_boundary])
+            digitized = np.array([2,0,1,2])[digitized]
+        else:
+            raise RickFlowException("Should never reach this part of the code.")
+        return digitized
+
+    def __call__(self, trajectory):
+        digitized = self._digitize(trajectory)
+        indices = np.arange(len(self.solute_ids))
+
+        # initialize flags for all permeants in region
+        if self.startframe == 0:
+            if self.initialize_permeants_from == "lower":
+                self.last_visited[np.where(digitized[0] == 1), 0] = -1
+            elif self.initialize_permeants_from == "upper":
+                self.last_visited[np.where(digitized[0] == 1), 2] = -1
+
+        # count events
+        for i in range(trajectory.n_frames):
+            frame = self.startframe + i
+
+            if self.previous_digitized is not None:
+                increment_using_multiindices(
+                    self.num_transitions,
+                    np.column_stack([self.previous_digitized, digitized[i]])
+                )
+                is_exit = np.logical_and(self.previous_digitized == 1, np.isin(digitized[i], [0,2]))
+                is_event = np.logical_and(
+                    is_exit,
+                    np.less(
+                        self.last_visited[(indices, digitized[i])],
+                        self.last_visited[(indices, 2-digitized[i])]
+                    )
+                )
+                particle_with_events = np.where(is_event)[0]
+                for particle in particle_with_events:
+                    print(self.last_visited)
+                    event = {
+                        "atom": self.solute_ids[particle],
+                        "frame": frame,
+                        "crossing_time_nframes": (
+                                frame - self.last_visited[particle, 2-digitized[i, particle]] - 1
+                                if self.last_visited[particle, 2-digitized[i, particle]] >= 0 else None
+                        ),
+                        "from_lower_boundary": digitized[i, particle]//2
+                    }
+                    self.events.append(event)
+
+            self.previous_digitized = np.copy(digitized[i])
+            self.last_visited[indices, digitized[i]] = frame
+
+        self.startframe += trajectory.n_frames
+
 
 class Distribution(rflow.observables.Distribution):
     def __init__(self, *args, **kwargs):

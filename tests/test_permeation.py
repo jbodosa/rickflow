@@ -2,7 +2,7 @@
 
 from rflow import (
     TransitionCounter, PermeationEventCounter, Distribution, RickFlowException,
-    PermeationEventCounterWithoutBuffer
+    PermeationEventCounterWithoutBuffer, RegionCrossingCounter
 )
 
 import pytest
@@ -207,3 +207,67 @@ def test_counter2_rebound():
             'from_water': 3, 'rebound_time_nframes': 5,
             'corresponding_entry_id': 1, 'exit_time_nframes': 2}
    ]
+
+
+def test_counter2_jumps(recwarn):
+    z = np.array([
+        [0.1, 0.3, 0.1, 0.6, 0.4, 0.1, 0.1], # a jump-entry and subsequent crossing
+        [0.1, 0.3, 0.1, 0.6, 0.4, 0.7, 0.1],  # a jump-entry and subsequent jump-exit with rebound
+    ])
+    z = np.row_stack([z, 1-z])
+    counter = PermeationEventCounterWithoutBuffer([0,1,2,3], 0.25)
+    counter(MockTrajectory(z))
+    assert len(recwarn) == 6  # 6 warnings raised
+    assert counter.events == [
+        {'event_id': 0, 'atom': 0, 'type': 'entry', 'frame': 4,
+         'from_water': 3, 'entry_time_nframes': 1},
+        {'event_id': 1, 'atom': 1, 'type': 'entry', 'frame': 4,
+         'from_water': 3, 'entry_time_nframes': 1},
+        {'event_id': 2, 'atom': 2, 'type': 'entry', 'frame': 4,
+         'from_water': 0, 'entry_time_nframes': 1},
+        {'event_id': 3, 'atom': 3, 'type': 'entry', 'frame': 4,
+         'from_water': 0, 'entry_time_nframes': 1},
+        {'event_id': 4, 'atom': 0, 'type': 'crossing', 'frame': 5,
+         'from_water': 3, 'crossing_time_nframes': 2,
+         'corresponding_entry_id': 0, 'exit_time_nframes': 1},
+        {'event_id': 5, 'atom': 2, 'type': 'crossing', 'frame': 5,
+         'from_water': 0, 'crossing_time_nframes': 2,
+         'corresponding_entry_id': 2, 'exit_time_nframes': 1},
+        {'event_id': 6, 'atom': 1, 'type': 'rebound', 'frame': 6,
+         'from_water': 3, 'rebound_time_nframes': 3,
+         'corresponding_entry_id': 1, 'exit_time_nframes': 1},
+        {'event_id': 7, 'atom': 3, 'type': 'rebound', 'frame': 6,
+         'from_water': 0, 'rebound_time_nframes': 3,
+         'corresponding_entry_id': 3, 'exit_time_nframes': 1}
+    ]
+
+
+def test_region_counter_noevent():
+    z0 = np.array([0.1, 0.2, 0.3, 0.5, 0.7, 0.749, 0.5, 0.2, 0.1, 0.9, 0.7, 0.3, 0.251, 0.5, 0.7, 0.9, 0.1])
+    z = np.row_stack([z0, 1-z0])
+    counter = RegionCrossingCounter([0,1], 0.25, 0.75, initialize_permeants_from="upper")
+    counter(MockTrajectory(z))
+    assert len(counter.events) == 0
+
+
+def test_region_counter_initialization():
+    z = np.array([
+        [0.3, 0.5, 0.9, 0.1, 0.19, 0.1, 0.9, 0.5, 0.3],
+        [0.3, 0.1, 0.9, 0.1, 0.19, 0.1, 0.9, 0.5, 0.3],
+    ])
+    counter = RegionCrossingCounter([0,1], 0.2, 0.4, initialize_permeants_from="upper")
+    counter(MockTrajectory(z))
+    assert counter.events == [{"atom": 1, "frame": 1, "crossing_time_nframes": None, "from_lower_boundary": 0}]
+
+
+def test_region_counter_crossings():
+    z0 = np.array([0.75, 0.1, 0.9, 0.6, 0.9, 0.8, 0.6, 0.4])
+    z = np.row_stack([z0, 1.5 - z0])
+
+    counter = RegionCrossingCounter([0,1], 0.5, 1.0, initialize_permeants_from=None)
+    counter(MockTrajectory(z))
+    assert counter.events == [
+        {"atom": 0, "frame": 7, "crossing_time_nframes": 5, "from_lower_boundary": 0},
+        {"atom": 1, "frame": 7, "crossing_time_nframes": 5, "from_lower_boundary": 1},
+    ]
+
