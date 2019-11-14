@@ -17,7 +17,12 @@ from rflow.observables import (TimeSeries, AreaPerLipid, Coordinates, BoxSize, B
                                EnergyDecomposition, ModuliInput)
 
 from rflow.biasing import *
-from rflow.permeation import TransitionCounter, PermeationEventCounter, PermeationEventCounterWithoutBuffer
+from rflow.permeation import (
+    TransitionCounter,
+    PermeationEventCounter,
+    PermeationEventCounterWithoutBuffer,
+    RegionCrossingCounter
+)
 from rflow.biasing import *
 from rflow.integrators import NonequilibriumLangevinIntegrator
 from rflow.rickflow import *
