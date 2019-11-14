@@ -639,11 +639,11 @@ class PermeationEventCounterWithoutBuffer:
     def _is_crossing(self, particles_with_transition):
         return np.logical_or(
             np.logical_and(
-                self._is_in_order(self.previous_last_visited[particles_with_transition], [0, 1, 2]),
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [3, 0, 1, 2]),
                 self._is_in_order(self.last_visited[particles_with_transition], [0, 1, 2, 3]),
             ),
             np.logical_and(
-                self._is_in_order(self.previous_last_visited[particles_with_transition], [3, 2, 1]),
+                self._is_in_order(self.previous_last_visited[particles_with_transition], [0, 3, 2, 1]),
                 self._is_in_order(self.last_visited[particles_with_transition], [3, 2, 1, 0]),
             )
         )
