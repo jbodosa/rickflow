@@ -286,7 +286,7 @@ class RelativePartialCenterOfMassRestraint(object):
         self.k0_name = f"k0{hex(id(self))}"
         self.zref_name = f"zref{hex(id(self))}"
         self.zcom_name = f"zcom{hex(id(self))}"
-        self.energy_string = f"{self.k0_name} * ({self.zcom_name} - {self.zref_name})^2"
+        self.energy_string = f"0.5*{self.k0_name} * ({self.zcom_name} - {self.zref_name})^2"
         self.box_height = box_height_guess
 
     def as_openmm_force(self, system):
@@ -332,7 +332,7 @@ class RelativePartialCenterOfMassRestraint(object):
             total_mass += masses[i]
             z_com += positions[i][2] * masses[i]
         z_com /= total_mass
-        return self.force_constant * (z_com/box_height - self.position)**2
+        return self.force_constant *0.5* (z_com/box_height - self.position)**2
 
 
 class ConstantPullingForce(object):
@@ -431,6 +431,6 @@ class AbsolutePartialCenterOfMassRestraint(object):
             total_mass += masses[i]
             z_com += positions[i][2] * masses[i]
         z_com /= total_mass
-        return s
+        return self.force_constant *0.5* (z_com - self.position)**2
 
 
