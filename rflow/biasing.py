@@ -50,7 +50,8 @@ def string_hash(*printables):
     """
     A helper function that creates a hash for an object that can be converted into a string
     """
-    return ",".join([str(p) for p in printables])#hex(hash(",".join([str(p) for p in printables])))
+    h = hex(hash(",".join([str(p) for p in printables])))
+    return "".join(char for char in h if char.isalnum())
 
 
 class FreeEnergyCosineSeries(object):
@@ -133,7 +134,7 @@ class FreeEnergyCosineSeries(object):
         Returns:
             A CustomExternalForce object: The cosine series as an OpenMM force.
         """
-        acoeff_name = f"A{string_hash(particle_ids)}"
+        acoeff_name = f"A{string_hash(particle_ids, self.coefficients)}"
         biasing_force = CustomExternalForce(str(self).replace("Acoeff", acoeff_name) + ';' + self.BOXHEIGHT_STRING + ';')
         biasing_force.addGlobalParameter("PI", np.pi)
         biasing_force.addGlobalParameter("LZ", self.averageBoxHeight)
@@ -154,8 +155,8 @@ class FreeEnergyCosineSeries(object):
             A CustomCVForce object: The cosine series as an OpenMM force.
         """
         # collective variables z0, z1, z... are relative to box height
-        acoeff_name = f"A{string_hash(particle_id_list)}"
-        zcoeff_name = f"z{string_hash(particle_id_list)}"
+        acoeff_name = f"A{string_hash(particle_id_list, self.coefficients)}"
+        zcoeff_name = f"z{string_hash(particle_id_list, self.coefficients)}"
         forces = []
         for res_nr in range(len(particle_id_list)):
             energy_string = " + ".join(
@@ -180,8 +181,8 @@ class FreeEnergyCosineSeries(object):
         return forces
 
     def as_openmm_centroid_force(self, particle_id_list):
-        acoeff_name = f"A{string_hash(particle_id_list)}"
-        zcoeff_name = f"z{string_hash(particle_id_list)}"
+        acoeff_name = f"A{string_hash(particle_id_list, self.coefficients)}"
+        zcoeff_name = f"z{string_hash(particle_id_list, self.coefficients)}"
         energy_string = str(self).replace("Acoeff", acoeff_name).replace(" z ",f" z1 ") + ";boxheight=h22;"
         biasing_force = CustomCentroidBondForce(1, energy_string)
         biasing_force.setUsesPeriodicBoundaryConditions(True)
@@ -293,9 +294,9 @@ class RelativePartialCenterOfMassRestraint(object):
             self.atom_ids = atom_ids
         self.force_constant = force_constant
         self.position = position
-        self.k0_name = f"k0{string_hash(atom_ids)}"
-        self.zref_name = f"zref{string_hash(atom_ids)}"
-        self.zcom_name = f"zcom{string_hash(atom_ids)}"
+        self.k0_name = f"k0{string_hash(atom_ids, force_constant, position)}"
+        self.zref_name = f"zref{string_hash(atom_ids, force_constant, position)}"
+        self.zcom_name = f"zcom{string_hash(atom_ids, force_constant, position)}"
         self.energy_string = f"{self.k0_name} * ({self.zcom_name} - {self.zref_name})^2"
         self.box_height = box_height_guess
 
