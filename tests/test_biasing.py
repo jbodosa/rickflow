@@ -3,7 +3,10 @@ Tests for biasing tools.
 """
 
 from rflow import biasing
-from rflow.biasing import FreeEnergyCosineSeries, RelativePartialCenterOfMassRestraint, ConstantPullingForce
+from rflow.biasing import (
+        FreeEnergyCosineSeries, RelativePartialCenterOfMassRestraint, 
+        ConstantPullingForce, AbsolutePartialCenterOfMassRestraint
+)
 from rflow.utility import abspath
 
 import pytest
@@ -140,9 +143,9 @@ def test_cos_openmm_force(force_type, constant_height):
             u.kilojoule_per_mole)
         assert target == approx(energy, abs=1e-5)
 
-
+@pytest.mark.parametrize("is_relative", [True, False])
 @pytest.mark.parametrize("force_type", ["cv", "centroid"])
-def test_partial_com_restraint(force_type):
+def test_partial_com_restraint(is_relative, force_type):
     # minimal system with one particle
     platform = Platform.getPlatformByName("Reference")
     system = System()
@@ -151,11 +154,13 @@ def test_partial_com_restraint(force_type):
     system.addParticle(2.0)
     k = 100.0 * u.kilojoule_per_mole
     box_length = 10.0*u.angstrom
-    bias = RelativePartialCenterOfMassRestraint([0,1],
-                                        force_constant=k,
-                                        position=0.7,
-                                        box_height_guess=box_length*1.2 # an inaccurate guess is OK
-                                        )
+    RestraintClass = RelativePartialCenterOfMassRestraint if is_relative else AbsolutePartialCenterOfMassRestraint
+    bias = RestraintClass(
+        [0,1],
+        force_constant=k if is_relative else k/box_length**2,
+        position=0.7 if is_relative else 0.7*box_length,
+        box_height_guess=box_length*1.2 # an inaccurate guess is OK
+    )
     if force_type == "cv":
         system.addForce(bias.as_openmm_cv_force(system))
     elif force_type == "centroid":
@@ -169,7 +174,7 @@ def test_partial_com_restraint(force_type):
         context.setPositions(positions)
         ener = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(
             u.kilojoule_per_mole)
-        expected = (k * ((2.*z*u.angstrom)/3./box_length - 0.7)**2).value_in_unit(u.kilojoule_per_mole)
+        expected = (0.5*k * ((2.*z*u.angstrom)/3./box_length - 0.7)**2).value_in_unit(u.kilojoule_per_mole)
         assert ener == approx(expected, abs=1e-4)
         assert ener == approx(
             bias(positions, [1.0*u.dalton,2.0*u.dalton], box_length).value_in_unit(u.kilojoule_per_mole),

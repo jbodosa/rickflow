@@ -297,7 +297,7 @@ class RelativePartialCenterOfMassRestraint(object):
         self.k0_name = f"k0{string_hash(atom_ids, force_constant, position)}"
         self.zref_name = f"zref{string_hash(atom_ids, force_constant, position)}"
         self.zcom_name = f"zcom{string_hash(atom_ids, force_constant, position)}"
-        self.energy_string = f"{self.k0_name} * ({self.zcom_name} - {self.zref_name})^2"
+        self.energy_string = f"0.5*{self.k0_name} * ({self.zcom_name} - {self.zref_name})^2"
         self.box_height = box_height_guess
 
     def as_openmm_force(self, system):
@@ -343,7 +343,7 @@ class RelativePartialCenterOfMassRestraint(object):
             total_mass += masses[i]
             z_com += positions[i][2] * masses[i]
         z_com /= total_mass
-        return self.force_constant * (z_com/box_height - self.position)**2
+        return self.force_constant *0.5* (z_com/box_height - self.position)**2
 
 
 class ConstantPullingForce(object):
@@ -379,5 +379,76 @@ class ConstantPullingForce(object):
 
     def __call__(self, z):
         return - self.force * z
+
+
+class AbsolutePartialCenterOfMassRestraint(object):
+    """
+    Harmonic restraint for the center of mass of a part of the system, e.g. a membrane, in absolute unites
+    NOTE: format is 1/2*K*(Z-Z0)**2
+    """
+    def __init__(self, atom_ids, force_constant=None, position=0, box_height_guess=None):
+        """
+        Args:
+            atom_ids (list of int): The atom ids on which the restraint acts.
+            force_constant (simtk.unit.Quantity object): The force constant in units of energy.
+            position (float): A float indicating the minimum of the restraint
+            box_height_guess (simtk.unit.Quantity object): A length that provides a guess
+                for the box height. Must not deviate from any instantaneous box height by more than 25%.
+        """
+        try:
+            self.atom_ids = atom_ids.tolist()
+        except AttributeError:
+            self.atom_ids = atom_ids
+        self.force_constant = force_constant
+        self.position = position
+        self.k0_name = f"k0{string_hash(atom_ids, force_constant, position)}"
+        self.zref_name = f"zref{string_hash(atom_ids, force_constant, position)}"
+        self.zcom_name = f"zcom{string_hash(atom_ids, force_constant, position)}"
+        self.energy_string = f"0.5 * {self.k0_name} * ({self.zcom_name} - {self.zref_name})^2"
+        self.box_height = box_height_guess
+
+    def as_openmm_force(self, system):
+        warnings.warn(
+            "AbsolutePartialCenterOfMassRestraint.as_openmm_force has been renamed "
+            "to AbsolutePartialCenterOfMassRestraint.as_openmm_cv_force", DeprecationWarning
+        )
+        return self.as_openmm_cv_force(system)
+
+    def as_openmm_cv_force(self, system):
+        """
+        Args:
+            system: The OpenMM system.
+
+        Returns::x
+            An OpenMM force object.
+        """
+        biasing_force = CustomCVForce(self.energy_string)
+        masses = [system.getParticleMass(atom) for atom in self.atom_ids]
+        com_cv = make_center_of_mass_z_cv(self.atom_ids, masses, relative=False, box_height=self.box_height)
+        biasing_force.addCollectiveVariable(self.zcom_name, com_cv)
+        biasing_force.addGlobalParameter(self.zref_name, self.position)
+        biasing_force.addGlobalParameter(self.k0_name, self.force_constant)
+        return biasing_force
+
+    def as_openmm_centroid_force(self):
+        biasing_force = CustomCentroidBondForce(1, self.energy_string.replace(self.zcom_name, "(z1)"))
+        groupid = biasing_force.addGroup(self.atom_ids)
+        biasing_force.addBond([groupid])
+        biasing_force.addGlobalParameter(self.zref_name, self.position)
+        biasing_force.addGlobalParameter(self.k0_name, self.force_constant)
+        return biasing_force
+
+    def __str__(self):
+        string = f"{self.energy_string}; {self.k0_name}={self.force_constant}, {self.zref_name}={self.position}"
+        return string
+
+    def __call__(self, positions, masses, box_height):
+        z_com = 0.0 * u.nanometer * u.dalton
+        total_mass = 0.0 * u.dalton
+        for i in self.atom_ids:
+            total_mass += masses[i]
+            z_com += positions[i][2] * masses[i]
+        z_com /= total_mass
+        return self.force_constant *0.5* (z_com - self.position)**2
 
 

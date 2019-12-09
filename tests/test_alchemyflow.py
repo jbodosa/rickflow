@@ -60,6 +60,13 @@ def test_alchemyflow(tmpdir):
         assert np.array(recalculated) == pytest.approx(potential, rel=None, abs=1e-2)
 
 
+try:
+    import pymbar
+    pymbar_exists = True
+except ImportError:
+    pymbar_exists = False
+
+@pytest.mark.skipif(not pymbar_exists, reason="This test requires a working pymbar installation.")
 def test_free_energy_difference(tmpdir):
     shutil.copytree(abspath("./data/alchemydata/"), str(tmpdir/"alchemydata"))
     file_template = str(tmpdir/"alchemydata/ener.{}.txt")
