@@ -37,7 +37,9 @@ def test_transitions(whex_iterator):
        )).all()
 
     # test brownian similarity api
-    print(tcount.brownian_similarity(1.0))
+    ex, fac = tcount.brownian_similarity(1.0)
+    print("ex\n", ex)
+    print("fac\n", fac)
 
 
 def test_permeation(whex_iterator):

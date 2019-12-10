@@ -92,10 +92,10 @@ class TransitionCounter(BinEdgeUpdater):
         exponents = []
         factors = []
         for bin in range(self.num_bins):
-            factor,exponent = curve_fit(curve, np.array(self.lag_iterations), fluxes[bin,:])
+            factor, exponent = curve_fit(curve, np.array(self.lag_iterations), fluxes[bin,:])[0]
             factors.append(factor)
             exponents.append(exponent)
-        return np.array(exponents), np.array(fluxes)
+        return np.array(exponents), np.array(factors)
 
 
 class PermeationEventCounter(object):
