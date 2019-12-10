@@ -15,7 +15,7 @@ import mdtraj as md
 def test_transitions(whex_iterator):
     iterator = whex_iterator
     #water = iterator.topology.select("water")
-    tcount = TransitionCounter([1], 10, [51]) # water)
+    tcount = TransitionCounter([1,5], 10, [51]) # water)
     for seq in iterator:
         tcount(seq)
     assert tcount.matrices[1].sum() == 199
@@ -35,6 +35,9 @@ def test_transitions(whex_iterator):
          [0, 0, 0, 0, 0, 0, 0, 0, 25, 5],
          [6, 0, 0, 0, 0, 0, 0, 0, 5, 59]]
        )).all()
+
+    # test brownian similarity api
+    print(tcount.brownian_similarity(1.0))
 
 
 def test_permeation(whex_iterator):
