@@ -143,11 +143,16 @@ def test_cos_openmm_force(force_type, constant_height):
             u.kilojoule_per_mole)
         assert target == approx(energy, abs=1e-5)
 
+
 @pytest.mark.parametrize("is_relative", [True, False])
 @pytest.mark.parametrize("force_type", ["cv", "centroid"])
-def test_partial_com_restraint(is_relative, force_type):
+@pytest.mark.parametrize("platform_name", ["CUDA", "CPU", "OpenCL", "Reference"])
+def test_partial_com_restraint(is_relative, force_type, platform_name):
     # minimal system with one particle
-    platform = Platform.getPlatformByName("Reference")
+    try:
+        platform = Platform.getPlatformByName(platform_name)
+    except:
+        pytest.skip(f"{platform_name} platform not available")
     system = System()
     system.addParticle(1.0)
     system.getNumParticles()
@@ -166,7 +171,7 @@ def test_partial_com_restraint(is_relative, force_type):
     elif force_type == "centroid":
         add_centroid_force(system, bias.as_openmm_centroid_force(), platform)
     context = Context(system, LangevinIntegrator(
-        500.0, 1. / u.picosecond, 1.0 * u.femtosecond))
+        500.0, 1. / u.picosecond, 1.0 * u.femtosecond), platform)
     context.setPeriodicBoxVectors(*np.eye(3)*box_length)
     for z in np.arange(0, 10.0, 0.1):
         positions = u.Quantity(
