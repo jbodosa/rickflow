@@ -292,4 +292,4 @@ def test_no_cluster_force(platform_name):
         for y in np.linspace(0.0, 8.0, 1.0):
             for z in np.linspace(0.0, 8.0, 1.0):
                 e, ref = energies(x,y,z)
-                assert np.isclose(e,ref,abs=1e-6, rel=0)
+                assert np.isclose(e,ref,atol=1e-6, rtol=0)
