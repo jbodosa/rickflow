@@ -487,6 +487,7 @@ class DontClusterXYForce:
 
     def as_openmm_force(self, particle_ids=[]):
         force = CustomCentroidBondForce(2, str(self))
+        force.setUsesPeriodicBoundaryConditions(True)
         for particle in particle_ids:
             force.addGroup([int(particle)])
         for i in range(len(particle_ids)):
