@@ -324,6 +324,7 @@ class RelativePartialCenterOfMassRestraint(object):
 
     def as_openmm_centroid_force(self):
         biasing_force = CustomCentroidBondForce(1, str(self).replace(self._zcom_name, "(z1/h22)"))
+        biasing_force.setUsesPeriodicBoundaryConditions(True)
         groupid = biasing_force.addGroup(self.atom_ids)
         biasing_force.addBond([groupid])
         return biasing_force
@@ -372,6 +373,7 @@ class ConstantPullingForce(object):
                 .replace(" y", " y1")
                 .replace(" x", " x1")
         )
+        biasing_force.setUsesPeriodicBoundaryConditions(True)
         groupid = biasing_force.addGroup(list(particle_ids))
         biasing_force.addBond([groupid])
         return biasing_force
@@ -432,6 +434,7 @@ class AbsolutePartialCenterOfMassRestraint(object):
 
     def as_openmm_centroid_force(self):
         biasing_force = CustomCentroidBondForce(1, str(self).replace(self._zcom_name, "(z1)"))
+        biasing_force.setUsesPeriodicBoundaryConditions(True)
         groupid = biasing_force.addGroup(self.atom_ids)
         biasing_force.addBond([groupid])
         return biasing_force
