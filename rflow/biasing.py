@@ -456,3 +456,41 @@ class AbsolutePartialCenterOfMassRestraint(object):
         return self.force_constant *0.5* (z_com - self.position)**2
 
 
+class DontClusterXYForce:
+    """A repulsive force in the xy plane of a system that prevents particles clustering in a membrane."""
+    def __init__(self, cutoff=2.0*u.nanometer, force_constant=100*u.kilojoules_per_mole/u.nanometer):
+        self.cutoff = cutoff
+        self.force_constant = force_constant
+
+    def __str__(self):
+        xdistsq = "xdistsq = min(min((x1-x2)^2, (x1-x2-h00)^2), (x1-x2+h00)^2); "
+        ydistsq = "ydistsq = min(min((y1-y2)^2, (y1-y2-h11)^2), (y1-y2+h11)^2); "
+        rxy = "rxy = sqrt(xdistsq + ydistsq); "
+        f = f"select(x < {self.d0_nm}, 0.5 * {self.k0_kjpernm} * (rxy-{self.d0_nm})^2, 0); "
+        return f + rxy + xdistsq + ydistsq
+
+    def __call__(self, pos1, pos2, box_lengths):
+        p1, p2, bl = np.array(pos1), np.array(pos2), np.array(box_lengths) # copies
+        dxsq = np.min([(p1[0]-p2[0])**2, (p1[0]-p2[0]+bl[0])**2, (p1[0]-p2[0]-bl[0])**2])
+        dysq = np.min([(p1[1]-p2[1])**2, (p1[1]-p2[1]+bl[1])**2, (p1[1]-p2[1]-bl[1])**2])
+        distxy = np.sqrt(dxsq + dysq)
+        return np.choose(distxy > self.d0_nm, [0.5*self.k0_kjpernm*(distxy - self.d0_nm)**2, np.zeros_like(distxy)])
+
+    @property
+    def d0_nm(self):
+        return self.cutoff.value_in_unit(u.nanometer) if isinstance(self.cutoff, u.Quantity) else self.cutoff
+
+    @property
+    def k0_kjpernm(self):
+        return (self.force_constant.value_in_unit(u.kilojoules_per_mole/u.nanometer)
+                if isinstance(self.force_constant, u.Quantity) else self.force_constant)
+
+    def as_openmm_force(self, particle_ids=[]):
+        force = CustomCentroidBondForce(2, str(self))
+        for particle in particle_ids:
+            force.addGroup([int(particle)])
+        for i in range(len(particle_ids)):
+            for j in range(i+1, len(particle_ids)):
+                force.addBond([i,j])
+        return force
+

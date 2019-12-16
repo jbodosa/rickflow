@@ -5,7 +5,8 @@ Tests for biasing tools.
 from rflow import biasing
 from rflow.biasing import (
         FreeEnergyCosineSeries, RelativePartialCenterOfMassRestraint, 
-        ConstantPullingForce, AbsolutePartialCenterOfMassRestraint
+        ConstantPullingForce, AbsolutePartialCenterOfMassRestraint,
+        DontClusterXYForce
 )
 from rflow.utility import abspath
 
@@ -235,6 +236,7 @@ def test_two_opposite_pull_periodic(as_omm):
         analytic_solution = 0
         assert z == pytest.approx(analytic_solution, abs=0.01)
 
+
 def test_centroid_force():
     #platform = Platform.getPlatformByName("Reference")
     system = System()
@@ -261,3 +263,33 @@ def test_centroid_force():
             pytest.skip("This version of OpenMM does not support h22 in CustomCentroidBondForce.")
         else:
             raise e
+
+
+@pytest.mark.parametrize("platform_name", ["CUDA", "CPU", "OpenCL", "Reference"])
+def test_no_cluster_force(platform_name):
+    try:
+        platform = Platform.getPlatformByName(platform_name)
+    except:
+        pytest.skip(f"{platform_name} platform not available")
+
+    system = System()
+    for i in range(2):
+        system.addParticle(1.0)
+    nocluster = DontClusterXYForce()
+    add_centroid_force(system, nocluster.as_openmm_force([0,1]))
+    integrator = VerletIntegrator(1.0 * u.femtosecond)
+    context = Context(system, integrator, platform)
+    context.setPeriodicBoxVectors(*np.eye(3) * 4.0 * u.nanometer)
+
+    def energies(x,y=0,z=0, ctx=context):
+        # from openmm
+        context.setPositions([[0.,0.,0.], [float(x), float(y), float(z)]])
+        energy = context.getState(getEnergy=True).getPotentialEnergy().value_in_unit(u.kilojoules_per_mole)
+        ref = nocluster([0,0,0], [x,y,z], [4,4,4])
+        return energy, ref
+
+    for x in np.linspace(0.0, 8.0, 1.0):
+        for y in np.linspace(0.0, 8.0, 1.0):
+            for z in np.linspace(0.0, 8.0, 1.0):
+                e, ref = energies(x,y,z)
+                assert np.isclose(e,ref,abs=1e-6, rel=0)
