@@ -466,7 +466,7 @@ class DontClusterXYForce:
         xdistsq = "xdistsq = min(min((x1-x2)^2, (x1-x2-h00)^2), (x1-x2+h00)^2); "
         ydistsq = "ydistsq = min(min((y1-y2)^2, (y1-y2-h11)^2), (y1-y2+h11)^2); "
         rxy = "rxy = sqrt(xdistsq + ydistsq); "
-        f = f"select(x < {self.d0_nm}, 0.5 * {self.k0_kjpernm} * (rxy-{self.d0_nm})^2, 0); "
+        f = f"select(rxy < {self.d0_nm}, 0.5 * {self.k0_kjpernm} * (rxy-{self.d0_nm})^2, 0); "
         return f + rxy + xdistsq + ydistsq
 
     def __call__(self, pos1, pos2, box_lengths):
