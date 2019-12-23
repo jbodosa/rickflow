@@ -222,7 +222,16 @@ def center_of_mass(positions, topology, selection):
     Returns:
         float: center of mass in nanometer
     """
-    masses = np.array([atom.element.mass.value_in_unit(u.dalton) for atom in topology.atoms()])
+    masses = []
+    for atom in topology.atoms():
+        if atom.element is None:
+            if atom.name.startswith("D"):
+                masses.append(0.4)  # Drude particle
+            else:
+                masses.append(0.0)  # virtual particle
+        else:
+            masses.append(atom.element.mass.value_in_unit(u.dalton))
+    masses = np.array(masses)
     positions = np.array(positions)
     return np.sum(
         positions[selection].transpose()
