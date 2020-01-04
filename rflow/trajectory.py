@@ -212,7 +212,9 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
 
     z_normalized = np.mod(z_normalized, 1.0).transpose()
 
-    return z_normalized
+    # calling mod again to avoid finite precision issues (e.g., np.mod(-1e-50,1.0) evaluates to 1.0 but we need to
+    # make sure that normalized values are in [0,1) )
+    return np.mod(z_normalized, 1.0)
 
 
 def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1,2]):
