@@ -1,3 +1,10 @@
+dist/
+build/
+examples/replica-exchange
+next.seqno
+_build/
+prof/
+.ipynb_checkpoints
 .idea/
 *~
 __pycache__/
