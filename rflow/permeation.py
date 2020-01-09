@@ -62,7 +62,7 @@ class TransitionCounter(BinEdgeUpdater):
                         self.matrices[lag],
                         np.column_stack([self.fifo_positions[0],self.fifo_positions[lag]]))
 
-    def save_matrices(self, filename_template, time_between_frames=1.0, dt=1.0):
+    def save_matrices(self, filename_template, time_between_frames, dt=1.0):
         """
         Writes transitions matrices in a format that can be read by diffusioncma and mcdiff.
         Args: 
