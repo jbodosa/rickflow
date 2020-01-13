@@ -49,7 +49,7 @@ class TransitionCounter(BinEdgeUpdater):
         # find bin indices
         h = 1.0 / self.num_bins
         bins = np.arange(h, 1.0 + h, h)
-        z_digitized = np.digitize(z_normalized, bins)
+        z_digitized = np.digitize(z_normalized, bins, right=True)
 
         for i in range(trajectory.n_frames):
             # update FIFO queue of positions
@@ -62,7 +62,7 @@ class TransitionCounter(BinEdgeUpdater):
                         self.matrices[lag],
                         np.column_stack([self.fifo_positions[0],self.fifo_positions[lag]]))
 
-    def save_matrices(self, filename_template, time_between_frames=1.0, dt=1.0):
+    def save_matrices(self, filename_template, time_between_frames, dt=1.0):
         """
         Writes transitions matrices in a format that can be read by diffusioncma and mcdiff.
         Args: 
@@ -224,7 +224,7 @@ class PermeationEventCounter(object):
         z_normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
 
         # find bin indices
-        z_digitized = np.digitize(z_normalized, self.bins)
+        z_digitized = np.digitize(z_normalized, self.bins, right=True)
         # initialize flags for all permeants
         if self.initialize_all_permeants:
             if (-999999 in self.last_functional_bin) or (-999999 in self.last_water_bin):
@@ -631,7 +631,7 @@ class PermeationEventCounterWithoutBuffer:
 
     def _digitize(self, trajectory):
         z_normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
-        return np.digitize(z_normalized, self.bins)
+        return np.digitize(z_normalized, self.bins, right=True)
 
     @staticmethod
     def _is_in_order(array, order):
@@ -715,10 +715,10 @@ class RegionCrossingCounter:
         """
         normalized = normalize(trajectory, 2, self.membrane, self.solute_ids)
         if self.opposite_center > self.upper_boundary:
-            digitized = np.digitize(normalized, [self.lower_boundary, self.upper_boundary, self.opposite_center])
+            digitized = np.digitize(normalized, [self.lower_boundary, self.upper_boundary, self.opposite_center], right=True)
             digitized[np.where(digitized == 3)] = 0
         elif self.opposite_center < self.lower_boundary:
-            digitized = np.digitize(normalized, [self.opposite_center, self.lower_boundary, self.upper_boundary])
+            digitized = np.digitize(normalized, [self.opposite_center, self.lower_boundary, self.upper_boundary], right=True)
             digitized = np.array([2,0,1,2])[digitized]
         else:
             raise RickFlowException("Should never reach this part of the code.")

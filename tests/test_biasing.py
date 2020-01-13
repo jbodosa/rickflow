@@ -33,8 +33,8 @@ def add_centroid_force(system, custom_centroid_bond_force, platform=None):
             Context(system, LangevinIntegrator(
                 500.0, 1. / u.picosecond, 1.0 * u.femtosecond), platform)
     except Exception as e:
-        if "Unknown variable 'h22'" in str(e):
-            pytest.skip("This version of OpenMM does not support h22 in CustomCentroidBondForce.")
+        if "Unknown variable 'h" in str(e):
+            pytest.skip("This version of OpenMM does not support unitcell lengths h00, h11, h22, ... in CustomCentroidBondForce.")
         elif "CustomCentroidBondForce requires a device that supports 64 bit atomic operations" in str(e):
             pytest.skip("Test runs only on CUDA")
         else:
