@@ -4,6 +4,7 @@ The reason for this is that CHARMM does not read frames with ID 0.
 """
 
 from simtk.openmm.app import DCDFile
+from simtk import unit as u
 
 
 class DCDReporter(object):
@@ -11,7 +12,7 @@ class DCDReporter(object):
     To use it, create a DCDReporter, then add it to the Simulation's list of reporters.
     """
 
-    def __init__(self, file, reportInterval, append=False, enforcePeriodicBox=None):
+    def __init__(self, file, reportInterval, velocities=False, append=False, enforcePeriodicBox=None):
         """Create a DCDReporter.
         Parameters
         ----------
@@ -19,6 +20,8 @@ class DCDReporter(object):
             The file to write to
         reportInterval : int
             The interval (in time steps) at which to write frames
+        velocities : bool
+            If True, write velocities. If False (the default), write positions.
         append : bool=False
             If True, open an existing DCD file to append to.  If False, create a new file.
         enforcePeriodicBox: bool
@@ -30,6 +33,7 @@ class DCDReporter(object):
         self._reportInterval = reportInterval
         self._append = append
         self._enforcePeriodicBox = enforcePeriodicBox
+        self._report_velocities = velocities
         if append:
             mode = 'r+b'
         else:
@@ -53,7 +57,10 @@ class DCDReporter(object):
             positions should be wrapped to lie in a single periodic box.
         """
         steps = self._reportInterval - simulation.currentStep%self._reportInterval
-        return (steps, True, False, False, False, self._enforcePeriodicBox)
+        if self._report_velocities:
+            return (steps, False, True, False, False, self._enforcePeriodicBox)
+        else:
+            return (steps, True, False, False, False, self._enforcePeriodicBox)
 
     def report(self, simulation, state):
         """Generate a report.
@@ -73,7 +80,13 @@ class DCDReporter(object):
                 self._reportInterval,
                 self._append
             )
-        self._dcd.writeModel(state.getPositions(), periodicBoxVectors=state.getPeriodicBoxVectors())
+        if self._report_velocities:
+            self._dcd.writeModel(
+                state.getVelocities().value_in_unit(u.angstrom/u.picosecond)*u.angstrom,  # to trick the DCDFile instance,
+                periodicBoxVectors=state.getPeriodicBoxVectors()
+            )
+        else:
+            self._dcd.writeModel(state.getPositions(), periodicBoxVectors=state.getPeriodicBoxVectors())
 
     def __del__(self):
         self._out.close()

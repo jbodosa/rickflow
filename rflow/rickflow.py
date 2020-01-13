@@ -13,6 +13,7 @@ from simtk import unit as u
 from simtk.openmm.app import PME, HBonds
 
 from rflow.exceptions import LastSequenceReached, RickFlowException
+from rflow.reporters.dcdreporter import DCDReporter
 from rflow.workflow import PsfWorkflow
 from rflow.utility import CWD
 
@@ -30,6 +31,7 @@ class RickFlow(PsfWorkflow):
     _resdir = "res"
     _logdir = "log"
     _dcd = lambda i: os.path.join(RickFlow._trjdir, f"dyn{i}.dcd")
+    _veldcd = lambda i: os.path.join(RickFlow._trjdir, f"vel{i}.dcd")
     _out = lambda i: os.path.join(RickFlow._outdir, f"out{i}.txt")
     _xml = lambda i: os.path.join(RickFlow._resdir, f"state{i}.xml")
     #_chk = lambda i: os.path.join(RickFlow._resdir, f"checkpoint{i}.chk")
@@ -52,6 +54,7 @@ class RickFlow(PsfWorkflow):
                  center_around=None,
                  analysis_mode=False,
                  precision="mixed",
+                 report_velocities=False,
                  **kwargs
                  ):
         """
@@ -98,6 +101,7 @@ class RickFlow(PsfWorkflow):
         self.analysis_mode = analysis_mode
         self.tmp_output_dir = tmp_output_dir
         self.initialize_velocities = initialize_velocities
+        self.report_velocities = report_velocities
         self._last_seqno = None
         self._next_seqno = None
         if 'use_vdw_force_switch' in kwargs:
@@ -241,6 +245,14 @@ class RickFlow(PsfWorkflow):
                 table_output_file=RickFlow._out(self.next_seqno),
                 precision=self.precision
             )
+            if self.dcd_output_interval > 0 and self.report_velocities:
+                self.simulation.reporters.append(
+                    DCDReporter(
+                        RickFlow._veldcd(self.next_seqno),
+                        self.dcd_output_interval,
+                        velocities=True
+                    )
+                )
 
     def initialize_state(self):
         """
@@ -299,6 +311,9 @@ class RickFlow(PsfWorkflow):
                 shutil.copy(RickFlow._dcd(self.next_seqno), os.path.join(self.work_dir, RickFlow._trjdir))
                 shutil.copy(RickFlow._out(self.next_seqno), os.path.join(self.work_dir, RickFlow._outdir))
                 shutil.copy(RickFlow._xml(self.next_seqno), os.path.join(self.work_dir, RickFlow._resdir))
+                if self.report_velocities:
+                    shutil.copy(RickFlow._veldcd(self.next_seqno), os.path.join(self.work_dir, RickFlow._trjdir))
+
                 #shutil.copy(RickFlow._chk(self.next_seqno), os.path.join(self.work_dir, RickFlow._resdir))
 
         self.next_seqno = self.next_seqno + 1

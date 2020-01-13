@@ -132,3 +132,24 @@ def test_analysis_mode(tmpdir):
         flow.run()
     assert os.listdir(work_dir) == []
 
+
+def test_velocity_dcds(tmpdir):
+    work_dir = str(tmpdir)
+    with CWD(work_dir):
+        flow = RickFlow(
+            toppar=glob.glob(os.path.join(abspath("data/toppar"), '*')),
+            psf=abspath("data/water.psf"),
+            crd=abspath("data/water.dcd"),
+            work_dir=".",
+            dcd_output_interval=1,
+            table_output_interval=1,
+            report_velocities=True,
+            steps_per_sequence=2,
+            gpu_id="CPU"
+        )
+        flow.prepare_simulation(LangevinIntegrator(300, 1, 0.001))
+        flow.run()
+        assert os.path.isfile(RickFlow._veldcd(1))
+        assert os.path.isfile(RickFlow._dcd(1))
+        assert os.path.isfile(RickFlow._out(1))
+        assert os.path.isfile(RickFlow._xml(1))
