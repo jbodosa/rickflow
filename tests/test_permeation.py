@@ -105,14 +105,14 @@ def test_permeability(whex_iterator):
 def test_permeation_warnings(whex_iterator):
     iterator = whex_iterator
     water = iterator.topology.select("water")
-    pcount = PermeationEventCounter(water, 0.1, 0.05, membrane="water", initialize_all_permeants=True)
+    pcount = PermeationEventCounter(water, 0.1, 0.01, membrane="water", initialize_all_permeants=True)
     for traj in iterator:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             pcount(traj)
     assert pcount.num_severe_warnings > 0
     #print(os.linesep, pcount.num_transitions_between_bins)
-    assert pcount.num_severe_warnings == 10
+    assert pcount.num_severe_warnings == 92
     print(pcount.severe_warnings)
 
 

@@ -217,7 +217,7 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
     return np.mod(z_normalized, 1.0)
 
 
-def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1,2]):
+def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1,2], allow_rewrapping=True):
     """
     Compute the center of mass of a selection of atoms.
     Args:
@@ -235,11 +235,47 @@ def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1
             return np.array([0.0]*len(coordinates))
     selected_atom_ids = select_atoms(trajectory, com_selection)
 
+    if allow_rewrapping and com_selection is not None:
+        xyz = rewrapped_coordinates_around_selection(trajectory, selected_atom_ids)
+    else:
+        xyz = trajectory.xyz
     for i, a in enumerate(trajectory.topology.atoms):
         assert i == a.index
     masses = np.array([atom.element.mass for atom in trajectory.topology.atoms])
     center_of_mass = np.einsum(
-        "i,ni...->n...", masses[selected_atom_ids], trajectory.xyz[:, selected_atom_ids])
+        "i,ni...->n...", masses[selected_atom_ids], xyz[:, selected_atom_ids])
     center_of_mass /= np.sum(masses[selected_atom_ids])
     return center_of_mass[:, coordinates]
+
+
+def rewrapped_coordinates_around_selection(trajectory, selection=None):
+    """
+    Rewrap so that the selection does not penetrate a boundary.
+    (Breaks molecules).
+
+    Args:
+        trajectory: mdtraj trajectory
+        selection: a DSL selection string or a list of atom ids
+
+    Returns:
+        A numpy array with shape (trajectory.n_frames, 3). Last axis is for x, y, z.
+        Elements are 0, if it does not wrap around a boundary, 1 for positive, -1 for negative
+    """
+    selected_atom_ids = select_atoms(trajectory, selection)
+    box_center = np.mean(trajectory.xyz, axis=1)
+    original = trajectory.xyz
+    rewrapped = np.choose(
+        original < box_center[:, None, :],
+        [original, original + trajectory.unitcell_lengths[:,None,:]]
+    )
+    needs_wrapping = (
+            np.std(original[:, selected_atom_ids, :], axis=1) > np.std(rewrapped[:, selected_atom_ids, :], axis=1)
+    )
+    wrapped_around_selection = np.choose(
+        needs_wrapping[:, None, :],
+        [original, rewrapped]
+    )
+    needs_shift_by_boxlength = np.mean(wrapped_around_selection[:, selected_atom_ids, :], axis=1) > trajectory.unitcell_lengths
+    return wrapped_around_selection - (needs_shift_by_boxlength * trajectory.unitcell_lengths)[:, None, :]
+
 

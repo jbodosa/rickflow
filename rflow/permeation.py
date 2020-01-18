@@ -5,6 +5,7 @@ Analysis tools for diffusivity and membrane permeation.
 """
 
 
+import warnings
 from warnings import warn
 
 import numpy as np
@@ -82,20 +83,22 @@ class TransitionCounter(BinEdgeUpdater):
             tmat.save(filename, dt=dt)
 
     def brownian_similarity(self, time_between_frames=1.0):
-        simulation_time = time_between_frames*self.n_frames
-        from scipy.optimize import curve_fit
-        curve = lambda x,a,b: a*x**b
-        fluxes = np.array([
-            [0.5*(self.matrices[lag][i-1,i]+self.matrices[lag][i,i-1])/simulation_time for lag in self.lag_iterations]
-            for i in range(self.num_bins)
-        ])
-        exponents = []
-        factors = []
-        for bin in range(self.num_bins):
-            factor, exponent = curve_fit(curve, np.array(self.lag_iterations), fluxes[bin,:])[0]
-            factors.append(factor)
-            exponents.append(exponent)
-        return np.array(exponents), np.array(factors), fluxes
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            simulation_time = time_between_frames*self.n_frames
+            from scipy.optimize import curve_fit
+            curve = lambda x,a,b: a*x**b
+            fluxes = np.array([
+                [0.5*(self.matrices[lag][i-1,i]+self.matrices[lag][i,i-1])/simulation_time for lag in self.lag_iterations]
+                for i in range(self.num_bins)
+            ])
+            exponents = []
+            factors = []
+            for bin in range(self.num_bins):
+                factor, exponent = curve_fit(curve, np.array(self.lag_iterations), fluxes[bin,:])[0]
+                factors.append(factor)
+                exponents.append(exponent)
+            return np.array(exponents), np.array(factors), fluxes
 
 
 class PermeationEventCounter(object):
