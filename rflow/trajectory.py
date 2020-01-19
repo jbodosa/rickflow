@@ -217,7 +217,7 @@ def normalize(trajectory, coordinates=2, com_selection=None, subselect="all"):
     return np.mod(z_normalized, 1.0)
 
 
-def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1,2], allow_rewrapping=True):
+def center_of_mass_of_selection(trajectory, com_selection=None, coordinates=[0,1,2], allow_rewrapping=False):
     """
     Compute the center of mass of a selection of atoms.
     Args:
