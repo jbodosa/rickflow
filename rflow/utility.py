@@ -240,9 +240,9 @@ def center_of_mass(positions, topology, selection):
     ) / np.sum(masses[selection])
 
 
-def recenter_positions(positions, selection, topology, box_lengths):
+def recenter_positions(positions, selection, topology, box_lengths, center_relative_position=0.5):
     current_com = center_of_mass(positions, topology, selection)
-    target_com = 0.5*np.array(box_lengths.value_in_unit(u.nanometer))
+    target_com = center_relative_position*np.array(box_lengths.value_in_unit(u.nanometer))
     move = target_com - current_com
     return positions + move
 

@@ -52,6 +52,7 @@ class RickFlow(PsfWorkflow):
                  misc_psf_create_system_kwargs={},
                  initialize_velocities=True,
                  center_around=None,
+                 center_relative_position=0.5,
                  analysis_mode=False,
                  precision="mixed",
                  report_velocities=False,
@@ -89,6 +90,8 @@ class RickFlow(PsfWorkflow):
             analysis_mode (bool): If True, create the workflow in its initial state without
                 setting up the directory structure or requiring a GPU.
             precision (str): "mixed", "single", or "double". Only active on CUDA platform, default: mixed.
+            center_relative_position (float): The relative position of the 'center_around' selection 
+                with respect to the box dimensions.
         """
         self.work_dir = work_dir
         self.gpu_id = gpu_id
@@ -131,7 +134,8 @@ class RickFlow(PsfWorkflow):
                 psf=psf,
                 crd=crd,
                 box_dimensions=box_dimensions,
-                center_around=center_around
+                center_around=center_around,
+                center_relative_position=center_relative_position 
             )
 
             if not steps_per_sequence % dcd_output_interval== 0:
