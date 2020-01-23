@@ -24,7 +24,8 @@ class PsfWorkflow(object):
             psf,
             crd,
             box_dimensions=None,
-            center_around="not water"
+            center_around="not water",
+            center_relative_position=0.5
     ):
         self._system = None
         self._simulation = None
@@ -47,7 +48,8 @@ class PsfWorkflow(object):
                 positions=self.positions,
                 selection=self.select(center_around),
                 topology=self.psf.topology,
-                box_lengths=self.psf.boxLengths
+                box_lengths=self.psf.boxLengths,
+                center_relative_position=center_relative_position
             )
 
     @property
