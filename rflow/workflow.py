@@ -25,7 +25,8 @@ class PsfWorkflow(object):
             crd,
             box_dimensions=None,
             center_around="not water",
-            center_relative_position=0.5
+            center_relative_position=0.5,
+            center_dcd_at_origin=False
     ):
         self._system = None
         self._simulation = None
@@ -51,6 +52,7 @@ class PsfWorkflow(object):
                 box_lengths=self.psf.boxLengths,
                 center_relative_position=center_relative_position
             )
+        self._center_dcd_at_origin = center_dcd_at_origin
 
     @property
     def system(self):
@@ -153,7 +155,12 @@ class PsfWorkflow(object):
         )
         if dcd_output_interval > 0:
             self.simulation.reporters.append(
-                DCDReporter(dcd_output_file, dcd_output_interval, enforcePeriodicBox=True)
+                DCDReporter(
+                    dcd_output_file,
+                    dcd_output_interval,
+                    enforcePeriodicBox=True,
+                    centerAtOrigin=self._center_dcd_at_origin
+                )
             )
         if table_output_interval > 0:
             self.simulation.reporters.append(StateDataReporter(

@@ -53,6 +53,7 @@ class RickFlow(PsfWorkflow):
                  initialize_velocities=True,
                  center_around=None,
                  center_relative_position=0.5,
+                 center_dcd_at_origin=False,
                  analysis_mode=False,
                  precision="mixed",
                  report_velocities=False,
@@ -67,11 +68,13 @@ class RickFlow(PsfWorkflow):
             crd (str): Initial coordinates (coordinate or trajectory file). If the trajectory contains multiple frames,
                 the positions are initialized from the last frame.
             box_dimensions (list): Box dimensions in Angstrom.
-            gpu_id (int or None): The device id of the CUDA-compatible GPU to be used. If None,
+            gpu_id (int, str, or None): The device id of the CUDA-compatible GPU to be used. If None,
                 the use of CUDA is not enforced and OpenMM may run on a slower platform.
                 Note that slurm scheduler is smart enough to map the gpu_id 0
                 to the first GPU that was allocated for the current job. Therefore multiple slurm jobs
                 with `gpu_id=0` can be run on the same node and each will have its own GPU.
+                To specify a different platform than CUDA, you can specify the platform name instead of an id
+                ("Reference", "CPU", or "CUDA").
             nonbonded_method (OpenMM object): openmm.app.PME for cutoff-LJ, openmm.app.LJPME for LJ-PME
             switch_distance (simtk.unit): Switching distance for LJ potential.
             cutoff_distance (simtk.unit): Cutoff distance for LJ potential.
@@ -92,6 +95,7 @@ class RickFlow(PsfWorkflow):
             precision (str): "mixed", "single", or "double". Only active on CUDA platform, default: mixed.
             center_relative_position (float): The relative position of the 'center_around' selection 
                 with respect to the box dimensions.
+            center_dcd_at_origin (bool): If True, the output trajectory fills the box as [-L/2,L/2] instead of [O,L]
         """
         self.work_dir = work_dir
         self.gpu_id = gpu_id
@@ -135,7 +139,8 @@ class RickFlow(PsfWorkflow):
                 crd=crd,
                 box_dimensions=box_dimensions,
                 center_around=center_around,
-                center_relative_position=center_relative_position 
+                center_relative_position=center_relative_position,
+                center_dcd_at_origin=center_dcd_at_origin
             )
 
             if not steps_per_sequence % dcd_output_interval== 0:
