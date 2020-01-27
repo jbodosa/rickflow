@@ -57,6 +57,7 @@ class RickFlow(PsfWorkflow):
                  analysis_mode=False,
                  precision="mixed",
                  report_velocities=False,
+                 ewald_tolerance=1e-4,
                  **kwargs
                  ):
         """
@@ -96,6 +97,7 @@ class RickFlow(PsfWorkflow):
             center_relative_position (float): The relative position of the 'center_around' selection 
                 with respect to the box dimensions.
             center_dcd_at_origin (bool): If True, the output trajectory fills the box as [-L/2,L/2] instead of [O,L]
+            ewald_tolerance (float): Error tolerance for reciprocal space forces.
         """
         self.work_dir = work_dir
         self.gpu_id = gpu_id
@@ -158,6 +160,7 @@ class RickFlow(PsfWorkflow):
             psf_create_system_kwargs = {
                 "nonbondedMethod": nonbonded_method,
                 "constraints": HBonds,
+                "ewaldErrorTolerance": ewald_tolerance
             }
             psf_create_system_kwargs.update(misc_psf_create_system_kwargs)
             self.create_system(
