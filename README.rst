@@ -22,6 +22,10 @@ Running and Analyzing OpenMM Jobs
 * Free software: MIT license
 * Documentation: https://rickflow.readthedocs.io.
 
+When using rickflow, please cite
+
+Andreas Krämer, A. Ghysels, E. Wang, R.M. Venable, J.B. Klauda, B.R. Brooks, R.W. Pastor (2020): 
+Membrane Permeability of Small Molecules from Unbiased Molecular Dynamics Simulations [submitted to J. Chem. Phys.].
 
 Features
 --------
