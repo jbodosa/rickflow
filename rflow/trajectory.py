@@ -81,11 +81,12 @@ class TrajectoryIterator(object):
                  infer_time=True, load_function=md.load):
 
         # select sequences
-        if '{}' in filename_template:
+        if filename_template.count('{') == 1 and filename_template.count('}') == 1:
             trajectory_files = glob.glob(filename_template.format("*"))
             if len(trajectory_files) == 0:
                 raise RickFlowException("No trajectory files matching your filename template.")
-            lstr, rstr = filename_template.split("{}")
+            lstr = filename_template.split("{")[0]
+            rstr = filename_template.split("}")[1]
             sequence_ids = [int(trj[len(lstr):len(trj) - len(rstr)])
                             for trj in trajectory_files]
             if first_sequence is None:
