@@ -82,13 +82,15 @@ class TrajectoryIterator(object):
 
         # select sequences
         if filename_template.count('{') == 1 and filename_template.count('}') == 1:
-            trajectory_files = glob.glob(filename_template.format("*"))
-            if len(trajectory_files) == 0:
-                raise RickFlowException("No trajectory files matching your filename template.")
             lstr = filename_template.split("{")[0]
             rstr = filename_template.split("}")[1]
+            trajectory_files = glob.glob(lstr+"*"+rstr)
             sequence_ids = [int(trj[len(lstr):len(trj) - len(rstr)])
                             for trj in trajectory_files]
+            # check if the files really exist (formatting can corrupt this)
+            sequence_ids = [i for i in sequence_ids if os.path.exists(filename_template.format(i))]
+            if len(sequence_ids) == 0:
+                raise RickFlowException("No trajectory files matching your filename template.")
             if first_sequence is None:
                 first_sequence = min(sequence_ids)
             if last_sequence is None:

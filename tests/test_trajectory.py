@@ -10,7 +10,7 @@ import mdtraj as md
 @pytest.fixture(scope="module")
 def iterator():
     return TrajectoryIterator(
-        filename_template=abspath("data/whex{}.dcd"),
+        filename_template=abspath("data/whex{:0d}.dcd"),
         first_sequence=1, last_sequence=2,
         topology_file=abspath("data/whex.pdb")
     )
