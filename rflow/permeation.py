@@ -71,15 +71,15 @@ class TransitionCounter(BinEdgeUpdater):
             time_between_frames (float): time elapsed between two trajectory frames in picoseconds.
             dt (float): the time step dt written into the header of the files.
         """
-        try:
-            from dcma.matrices import Transitions
-        except ImportError:
-            raise RickFlowException("Saving transition matrices requires the dcma package to be installed.")
+        from rflow.utility import _DCMATransitions
         for lag in self.matrices:
             filename = filename_template.format(lag)
             #                              dcma expects edges in angstrom: multiply by 10
-            tmat = Transitions(lag_time=lag*time_between_frames, edges=self.edges_around_zero*10.0, 
-                               matrix=self.matrices[lag])
+            tmat = _DCMATransitions(
+                lag_time=lag*time_between_frames,
+                edges=self.edges_around_zero*10.0,
+                matrix=self.matrices[lag]
+            )
             tmat.save(filename, dt=dt)
 
     def brownian_similarity(self, time_between_frames=1.0):

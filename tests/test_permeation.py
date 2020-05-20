@@ -2,9 +2,11 @@
 
 from rflow import (
     TransitionCounter, PermeationEventCounter, Distribution, RickFlowException,
-    PermeationEventCounterWithoutBuffer, RegionCrossingCounter
+    PermeationEventCounterWithoutBuffer, RegionCrossingCounter, abspath
 )
+from rflow.utility import _DCMATransitions
 
+import os
 import pytest
 import warnings
 import numpy as np
@@ -12,7 +14,7 @@ import numpy as np
 import mdtraj as md
 
 
-def test_transitions(whex_iterator):
+def test_transitions(whex_iterator, tmpdir):
     iterator = whex_iterator
     #water = iterator.topology.select("water")
     tcount = TransitionCounter([1,5], 10, [51]) # water)
@@ -35,6 +37,16 @@ def test_transitions(whex_iterator):
          [0, 0, 0, 0, 0, 0, 0, 0, 25, 5],
          [6, 0, 0, 0, 0, 0, 0, 0, 5, 59]]
        )).all()
+    template = os.path.join(str(tmpdir),"transition_matrix{}.txt")
+    gold_standard = abspath("data/transition_matrix{}.txt")
+
+    tcount.save_matrices(os.path.join(str(tmpdir),"transition_matrix{}.txt"), time_between_frames=2)
+    for lag in [1,5]:
+        now = _DCMATransitions.from_file(template.format(lag))
+        then = _DCMATransitions.from_file(gold_standard.format(lag))
+        assert np.isclose(now.edges, then.edges).all()
+        assert np.isclose(now.lag_time, then.lag_time)
+        assert np.isclose(now.matrix, then.matrix).all()
 
     # test brownian similarity api
     ex, fac, flux = tcount.brownian_similarity(1.0)

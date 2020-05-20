@@ -246,3 +246,57 @@ def recenter_positions(positions, selection, topology, box_lengths, center_relat
     move = target_com - current_com
     return positions + move
 
+
+class _DCMATransitions:
+    """A copy of the saving and loading parts of dcma.Transitions to get rid of that dependency."""
+    # --- CONSTRUCTORS ---
+    def __init__(self, matrix, lag_time, edges, weight=1.0):
+        assert lag_time > 0.0
+        self.matrix = matrix
+        self.lag_time = lag_time
+        self.edges = edges
+        assert len(edges) == len(matrix) + 1
+
+    @staticmethod
+    def from_file(filename, weight=1.0):
+        """
+        Read a transition matrix and context information from file.
+        """
+        assert os.path.isfile(filename)
+        lag_time = None
+        edges = None
+        with open(filename, "r") as f:
+            n_comment_lines = 0
+            for l in f:
+                if not l.startswith("#"):
+                    break
+                n_comment_lines += 1
+                if l.startswith("#lt"):
+                    lag_time = float(l.replace("#lt","").strip())
+                elif l.startswith("#edges"):
+                    edges = l.replace("#edges","").strip().split()
+                    edges = np.array([float(e) for e in edges])
+        assert lag_time is not None
+        assert edges is not None
+        transition_matrix = np.loadtxt(filename, skiprows=n_comment_lines)
+        return _DCMATransitions(transition_matrix, lag_time, edges, weight)
+
+    def save(self, filename, dt=1.0, count="pbc"):
+        """
+        save transition matrix to file
+
+        Args:
+            dt (float): The dt that is written into the header.
+            count (str): That count that is written into the header.
+        """
+        edges = " ".join([str(e) for e in self.edges])
+        lines = [
+            "#lt    {}".format(self.lag_time),
+            "#count {}".format(count),
+            "#dt    {}".format(dt),
+            "#dn    {}".format(int(self.lag_time)),
+            "#edges {}".format(edges)
+        ]
+        lines += [ " ".join("{:d}".format(int(el)) for el in row) for row in self.matrix]
+        with open(filename, 'w') as fp:
+            fp.writelines([line + os.linesep for line in lines])
