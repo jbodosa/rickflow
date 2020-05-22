@@ -214,7 +214,7 @@ class Distribution(BinEdgeUpdater):
         Concentration of solute in a part of the system.
         Args:
             bins (list or np.array): a list of ids to identify the bins
-            area (float): area in nanometer
+            area (float): area in nanometer^2
             num_molecules (int): number of molecules, by default take the number of selected atoms.
 
         Returns:
