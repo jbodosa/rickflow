@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from rflow import TrajectoryIterator, normalize, center_of_mass_of_selection
+from rflow import TrajectoryIterator, TrajectoryFileIterator, normalize, center_of_mass_of_selection
 from rflow.trajectory import rewrapped_coordinates_around_selection
 from rflow.utility import abspath
 import numpy as np
 import pytest
 import mdtraj as md
+
 
 @pytest.fixture(scope="module")
 def iterator():
@@ -14,6 +15,15 @@ def iterator():
         first_sequence=1, last_sequence=2,
         topology_file=abspath("data/whex.pdb")
     )
+
+
+def test_file_iterator():
+    trajectories = TrajectoryFileIterator(
+        filenames=[abspath("data/whex1.dcd"), abspath("data/whex2.dcd")],
+        topology_file=abspath("data/whex.pdb")
+    )
+    for traj in trajectories:
+        assert traj.n_frames == 100
 
 
 def test_iterator(iterator):
