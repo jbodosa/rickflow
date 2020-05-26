@@ -32,6 +32,21 @@ def make_topology(topology_file):
 
 
 class TrajectoryFileIterator:
+    """An iterator that runs over trajectory files.
+
+    Args:
+        filenames (iterable):         A list of dictionary of trajectory filenames.
+        topology_file (str):          Filename of the topology file (pdb or psf).
+        select_atoms (str or list of int): A selection of atoms; default="all".
+        time_between_frames (float): The time between trajectory frames in picoseconds; default=1.
+        num_frames_per_trajectory (int or None): The number of frames in each sequence; default=None.
+                                      If None, infer the the number of frames from the first sequence that is read in.
+        infer_time (bool):            Whether the time field in the trajectory should be inferred heuristically from
+                                      the time between frames and number of frames per trajectory file.
+        load_function (callable or str): The function used to load the file (e.g. md.load),
+                                      or the trajectory format as a string.
+                                      By default the format is inferred from the file suffix.
+    """
     def __init__(
         self,
         filenames,
