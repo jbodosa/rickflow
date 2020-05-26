@@ -11,7 +11,8 @@ del get_versions
 
 from rflow.exceptions import *
 from rflow.utility import increment_using_multiindices, select_atoms, CWD, abspath
-from rflow.trajectory import (TrajectoryIterator, CharmmTrajectoryIterator, make_topology, normalize,
+from rflow.trajectory import (TrajectoryIterator, TrajectoryFileIterator,
+                              CharmmTrajectoryIterator, make_topology, normalize,
                               center_of_mass_of_selection)
 from rflow.observables import (TimeSeries, AreaPerLipid, Coordinates, BoxSize, BinEdgeUpdater, Distribution,
                                EnergyDecomposition, ModuliInput)
