@@ -20,5 +20,6 @@ def test_start_from_dcd(tmpdir):
         print(workflow.topology.getPeriodicBoxVectors())
         workflow.create_system()
         workflow.create_simulation(LangevinIntegrator(300*u.kelvin, 5./u.picosecond, 1.0*u.femtoseconds), gpu_id=None)
+        assert workflow.constraint_tolerance < 2e-7
         workflow.initialize_state()
         workflow.run(1)

@@ -96,6 +96,18 @@ class PsfWorkflow(object):
             barostat.setDefaultTemperature(temp)
             self.context.setParameter(barostat.Temperature(), temp)
 
+    @property
+    def integrator(self):
+        return self.context.getIntegrator()
+
+    @property
+    def constraint_tolerance(self):
+        return self.integrator.getConstraintTolerance()
+
+    @constraint_tolerance.setter
+    def constraint_tolerance(self, tol):
+        self.integrator.setConstraintTolerance(tol)
+
     def select(self, *args, **kwargs):
         return self.mdtraj_topology.select(*args, **kwargs)
 
@@ -146,6 +158,13 @@ class PsfWorkflow(object):
         if barostat:
             self.system.addForce(barostat)
         platform, platform_properties = get_platform(gpu_id, precision)
+        if (
+                precision != "single"
+                and hasattr(integrator, "getConstraintTolerance")
+                and integrator.getConstraintTolerance() > 2e-7
+        ):
+            print("Automatically tightening the integrator's constraint tolerance to 1e-7.")
+            integrator.setConstraintTolerance(1e-7)
         self._simulation = Simulation(
             self.topology,
             self.system,
