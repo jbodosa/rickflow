@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 
 import mdtraj as md
-from simtk import unit as u
-from simtk.openmm import VerletIntegrator, Context, System
-from simtk.openmm.app import CharmmPsfFile
+from rflow.openmm import unit as u
+from rflow.openmm import VerletIntegrator, Context, System
+from rflow.openmm.app import CharmmPsfFile
 
 from rflow.utility import increment_using_multiindices, read_input_coordinates, abspath
 

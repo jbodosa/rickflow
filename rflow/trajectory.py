@@ -10,7 +10,7 @@ import warnings
 
 import numpy as np
 
-from simtk.openmm.app import CharmmPsfFile
+from rflow.openmm.app import CharmmPsfFile
 
 import mdtraj as md
 

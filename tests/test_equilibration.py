@@ -5,8 +5,8 @@ import glob
 import numpy as np
 import pytest
 
-from simtk import unit as u
-from simtk.openmm import LangevinIntegrator, MonteCarloBarostat
+from rflow.openmm import unit as u
+from rflow.openmm import LangevinIntegrator, MonteCarloBarostat
 from rflow.utility import CWD, abspath
 from rflow.rickflow import RickFlow
 from rflow.equilibration import equilibrate

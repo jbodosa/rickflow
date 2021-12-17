@@ -11,7 +11,7 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 
-from simtk import unit as u
+from rflow.openmm import unit as u
 
 import rflow.observables
 from rflow.utility import increment_using_multiindices

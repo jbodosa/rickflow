@@ -41,8 +41,8 @@ import logging
 import re
 
 import numpy as np
-import simtk.unit as unit
-import simtk.openmm as mm
+import rflow.openmm.unit as unit
+import rflow.openmm as mm
 
 from openmmtools.constants import kB
 from openmmtools import respa, utils
@@ -159,7 +159,8 @@ class ThermostatedIntegrator(utils.RestorableOpenMMObject,
     setters and getters for the temperature and to add a per-DOF constant
     "sigma" that we need to update only when the temperature is changed.
 
-    >>> from simtk import openmm, unit
+    >>> import openmm
+    >>> from openmm import unit
     >>> class TestIntegrator(ThermostatedIntegrator):
     ...     def __init__(self, temperature=298.0*unit.kelvin, timestep=1.0*unit.femtoseconds):
     ...         super(TestIntegrator, self).__init__(temperature, timestep)
@@ -265,7 +266,7 @@ class ThermostatedIntegrator(utils.RestorableOpenMMObject,
 
         Parameters
         ----------
-        integrator : simtk.openmm.Integrator
+        integrator : openmm.Integrator
             The integrator to check.
 
         Returns
@@ -290,7 +291,7 @@ class ThermostatedIntegrator(utils.RestorableOpenMMObject,
 
         Parameters
         ----------
-        integrator : simtk.openmm.CustomIntegrator
+        integrator : openmm.CustomIntegrator
             The integrator to which add methods.
 
         Returns
@@ -318,7 +319,7 @@ class ThermostatedIntegrator(utils.RestorableOpenMMObject,
 
     @property
     def kT(self):
-        """The thermal energy in simtk.openmm.Quantity"""
+        """The thermal energy in openmm.Quantity"""
         return self.getGlobalVariableByName("kT") * _OPENMM_ENERGY_UNIT
 
 

@@ -2,8 +2,8 @@
 import pytest
 from copy import deepcopy
 import numpy as np
-from simtk.openmm import Context, VerletIntegrator
-from simtk import unit as u
+from rflow.openmm import Context, VerletIntegrator
+from rflow.openmm import unit as u
 from openmmtools import testsystems
 from rflow.modcharge import scale_subsystem_charges
 
@@ -52,8 +52,8 @@ def test_scale_charges():
 
 @pytest.mark.parametrize("create_exceptions", [True, False])
 def test_internal_electrostatic_correction(create_exceptions):
-    from simtk.openmm import System, NonbondedForce
-    from simtk.openmm.app import Topology, Chain, Residue, Atom
+    from rflow.openmm import System, NonbondedForce
+    from rflow.openmm.app import Topology, Chain, Residue, Atom
     system = System()
     topology = Topology()
     chain = topology.addChain(0)

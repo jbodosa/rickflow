@@ -8,10 +8,10 @@ Andreas Kraemer, 2018.
 
 import warnings
 import numpy as np
-import simtk.unit as u
-from simtk.openmm.openmm import CustomExternalForce, CustomCVForce, CustomCentroidBondForce
-from simtk.openmm.openmm import System, TwoParticleAverageSite, NonbondedForce
-from simtk.openmm.app import Element
+import rflow.openmm.unit as u
+from rflow.openmm import CustomExternalForce, CustomCVForce, CustomCentroidBondForce
+from rflow.openmm import System, TwoParticleAverageSite, NonbondedForce
+from rflow.openmm.app import Element
 from rflow.utility import select_atoms
 
 
@@ -24,7 +24,7 @@ def make_center_of_mass_z_cv(particle_ids, masses, relative=True,
         particle_ids (list of int): List of particle ids.
         masses (list of floats): The particle masses.
         relative (bool): If True, divide com by instantaneous box length.
-        box_height (a simtk.unit for lengths): A guess for the instantaneous box_height.
+        box_height (a openmm.unit for lengths): A guess for the instantaneous box_height.
 
     Returns:
         A collective variable (in OpenMM, a collective variable is expressed as a custom force object).
@@ -52,15 +52,15 @@ class FreeEnergyCosineSeries(object):
     that can be used as a biasing potential.
 
     When using this class you have to work consistently with either unitless
-    quantities (floats, np.arrays) or simtk.unit.Quantity.
+    quantities (floats, np.arrays) or openmm.unit.Quantity.
     """
 
     def __init__(self, average_box_height, coefficients, constant_height=False, id=""):
         """
         Args:
-            average_box_height (float or simtk.unit.Quantity):
+            average_box_height (float or openmm.unit.Quantity):
                 Average height of the simulation system.
-            coefficients (np.array or simtk.unit.Quantity):
+            coefficients (np.array or openmm.unit.Quantity):
                 Coefficients of the cosine series.
             constant_height (boolean): Whether or not the system should be
                 simulated with a constant height.
@@ -111,7 +111,7 @@ class FreeEnergyCosineSeries(object):
         Evaluate the series at a given data point.
 
         Args:
-            z (float or np.array or simtk.unit.Quantity): The z coordinate.
+            z (float or np.array or openmm.unit.Quantity): The z coordinate.
             box_height (float): The instantaneous box height.
 
         Returns:
@@ -234,7 +234,7 @@ class FreeEnergyCosineSeries(object):
             An instance of this class.
 
         Note:
-            This class sets up the coefficients as a simtk.unit.Quantity object.
+            This class sets up the coefficients as a openmm.unit.Quantity object.
         """
         summe = counts.sum()
         # free energy
@@ -258,7 +258,7 @@ class FreeEnergyCosineSeries(object):
             An instance of this class.
 
         Note:
-            This class sets up the coefficients as a simtk.unit.Quantity object.
+            This class sets up the coefficients as a openmm.unit.Quantity object.
         """
         num_bins = len(free_energy)
         fe = (0.5 * (free_energy + free_energy[::-1]).
@@ -284,10 +284,10 @@ class RelativePartialCenterOfMassRestraint(object):
         """
         Args:
             atom_ids (list of int): The atom ids on which the restraint acts.
-            force_constant (simtk.unit.Quantity object): The force constant in units of energy.
+            force_constant (openmm.unit.Quantity object): The force constant in units of energy.
             position (float): A float between 0 and 1, indicating the minimum of the restraint
                 relative to the instantaneous box height.
-            box_height_guess (simtk.unit.Quantity object): A length that provides a guess
+            box_height_guess (openmm.unit.Quantity object): A length that provides a guess
                 for the box height. Must not deviate from any instantaneous box height by more than 25%.
         """
         try:
@@ -395,9 +395,9 @@ class AbsolutePartialCenterOfMassRestraint(object):
         """
         Args:
             atom_ids (list of int): The atom ids on which the restraint acts.
-            force_constant (simtk.unit.Quantity object): The force constant in units of energy / length**2.
+            force_constant (openmm.unit.Quantity object): The force constant in units of energy / length**2.
             position (float): A float indicating the minimum of the restraint
-            box_height_guess (simtk.unit.Quantity object): A length that provides a guess
+            box_height_guess (openmm.unit.Quantity object): A length that provides a guess
                 for the box height. Must not deviate from any instantaneous box height by more than 25%.
         """
         try:

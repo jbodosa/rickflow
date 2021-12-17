@@ -6,12 +6,12 @@ import pkg_resources
 import traceback
 import numpy as np
 
-from simtk.openmm import (
+from rflow.openmm import (
     MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat,
     Platform, NonbondedForce, CustomNonbondedForce
 )
-from simtk.openmm.app import CharmmCrdFile
-from simtk import unit as u
+from rflow.openmm.app import CharmmCrdFile
+from rflow.openmm import unit as u
 import mdtraj as md
 
 from rflow.exceptions import RickFlowException, NoCuda

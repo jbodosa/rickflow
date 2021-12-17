@@ -3,8 +3,8 @@ import glob
 import os
 from rflow.workflow import PsfWorkflow
 from rflow.utility import abspath, CWD
-from simtk.openmm import LangevinIntegrator
-from simtk import unit as u
+from rflow.openmm import LangevinIntegrator
+from rflow.openmm import unit as u
 
 def test_start_from_dcd(tmpdir):
     with CWD(tmpdir):

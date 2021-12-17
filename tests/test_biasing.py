@@ -17,9 +17,9 @@ import os
 import random
 import numpy as np
 
-from simtk.openmm import System, Context, LangevinIntegrator, VerletIntegrator, Platform
-from simtk.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
-from simtk import unit as u
+from rflow.openmm import System, Context, LangevinIntegrator, VerletIntegrator, Platform
+from rflow.openmm.app import Simulation, Topology, DCDReporter, Element, PDBReporter
+from rflow.openmm import unit as u
 
 
 def add_centroid_force(system, custom_centroid_bond_force, platform=None):
@@ -242,7 +242,7 @@ def test_centroid_force():
     system = System()
     for i in range(4):
         system.addParticle(1.0)
-    from simtk.openmm import CustomCentroidBondForce
+    from rflow.openmm import CustomCentroidBondForce
     force = CustomCentroidBondForce(1, "z1 + h22")# + k * distance(g1,g2)")
     force.setUsesPeriodicBoundaryConditions(True)
     force.addGroup([0])

@@ -9,8 +9,8 @@ Correspondance: jul316@lehigh.edu or wonpil@lehigh.edu
 Last update: March 29, 2017
 """
 
-from simtk.openmm import *
-import simtk.unit as u
+from rflow.openmm import *
+import rflow.openmm.unit as u
 
 
 def vfswitch(system, psf, switch_distance, cutoff_distance):

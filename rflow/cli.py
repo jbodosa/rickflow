@@ -32,10 +32,10 @@ def create(template):
     dynpy = """
 #! /usr/bin/env python
 
-import simtk.unit as u
-from simtk.openmm.app import PME, LJPME
-from simtk.openmm import MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat
-from simtk.openmm import DrudeLangevinIntegrator, LangevinIntegrator
+import rflow.openmm.unit as u
+from rflow.openmm.app import PME, LJPME
+from rflow.openmm import MonteCarloBarostat, MonteCarloAnisotropicBarostat, MonteCarloMembraneBarostat
+from rflow.openmm import DrudeLangevinIntegrator, LangevinIntegrator
 from rickflow import RickFlow, NoseHooverChainVelocityVerletIntegrator
 
 

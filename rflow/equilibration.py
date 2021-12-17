@@ -1,9 +1,9 @@
 
 import os
 
-from simtk import unit as u
-from simtk.openmm.app import Simulation, StateDataReporter
-from simtk.openmm import (LangevinIntegrator, DrudeForce, DrudeLangevinIntegrator)
+from rflow.openmm import unit as u
+from rflow.openmm.app import Simulation, StateDataReporter
+from rflow.openmm import (LangevinIntegrator, DrudeForce, DrudeLangevinIntegrator)
 
 from rflow.exceptions import RickFlowException
 from rflow.utility import get_barostat, get_force, CWD, get_platform

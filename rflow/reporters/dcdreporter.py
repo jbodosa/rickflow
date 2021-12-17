@@ -3,8 +3,8 @@ DCD reporter that does not report the zero-th step and inserts the correct "firs
 The reason for this is that CHARMM does not read frames with ID 0.
 """
 
-from simtk.openmm.app import DCDFile
-from simtk import unit as u
+from rflow.openmm.app import DCDFile
+from rflow.openmm import unit as u
 import numpy as np
 import networkx as nx
 import mdtraj as md

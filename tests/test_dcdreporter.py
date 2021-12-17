@@ -1,9 +1,9 @@
 
-from simtk.openmm import LangevinIntegrator
+from rflow.openmm import LangevinIntegrator
 from rflow import RickFlow, abspath, CWD
 import glob
 import os
-from simtk import unit as u
+from rflow.openmm import unit as u
 import mdtraj as md
 import pytest
 

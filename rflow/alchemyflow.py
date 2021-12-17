@@ -2,7 +2,7 @@
 import os
 from copy import deepcopy
 
-from simtk import unit as u
+from rflow.openmm import unit as u
 
 from openmmtools import alchemy
 

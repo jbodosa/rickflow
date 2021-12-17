@@ -4,10 +4,10 @@ import shutil
 import pytest
 import numpy as np
 
-from simtk import unit as u
+from rflow.openmm import unit as u
 
-from simtk.openmm import LangevinIntegrator
-from simtk.openmm.app import NoCutoff, StateDataReporter
+from rflow.openmm import LangevinIntegrator
+from rflow.openmm.app import NoCutoff, StateDataReporter
 
 from rflow.alchemyflow import AlchemyFlow
 from rflow.reporters.alchemyreporter import FreeEnergyDifference
