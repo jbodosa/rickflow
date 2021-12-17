@@ -9,6 +9,7 @@ from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
+import rflow.openmm
 from rflow.exceptions import *
 from rflow.utility import increment_using_multiindices, select_atoms, CWD, abspath
 from rflow.trajectory import (TrajectoryIterator, TrajectoryFileIterator,

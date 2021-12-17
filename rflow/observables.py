@@ -8,9 +8,9 @@ import pickle
 import numpy as np
 import pandas as pd
 
-from simtk.openmm import Context, LangevinIntegrator, NonbondedForce, Platform
+from rflow.openmm import Context, LangevinIntegrator, NonbondedForce, Platform
 from mdtraj.utils import lengths_and_angles_to_box_vectors
-import simtk.unit as u
+import rflow.openmm.unit as u
 
 from rflow.trajectory import normalize
 from rflow.utility import select_atoms

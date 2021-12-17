@@ -9,8 +9,8 @@ import warnings
 import numpy as np
 import shutil
 
-from simtk import unit as u
-from simtk.openmm.app import PME, HBonds
+from rflow.openmm import unit as u
+from rflow.openmm.app import PME, HBonds
 
 from rflow.exceptions import LastSequenceReached, RickFlowException
 from rflow.reporters.dcdreporter import DCDReporter
@@ -77,8 +77,8 @@ class RickFlow(PsfWorkflow):
                 To specify a different platform than CUDA, you can specify the platform name instead of an id
                 ("Reference", "CPU", or "CUDA").
             nonbonded_method (OpenMM object): openmm.app.PME for cutoff-LJ, openmm.app.LJPME for LJ-PME
-            switch_distance (simtk.unit): Switching distance for LJ potential.
-            cutoff_distance (simtk.unit): Cutoff distance for LJ potential.
+            switch_distance (openmm.unit): Switching distance for LJ potential.
+            cutoff_distance (openmm.unit): Cutoff distance for LJ potential.
             vdw_switching (str): Can be "charmm-gui" (CHARMM-GUI implementation of vfswitch; the default),
                 "vswitch" (from openmmtools), "vfswitch" (from openmmtools),
                 or "openmm" (OpenMM's built-in switching function; the fastest option).

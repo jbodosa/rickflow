@@ -2,9 +2,9 @@
 import numpy as np
 import networkx as nx
 import openmmtools
-from simtk import unit as u
-from simtk.openmm import NonbondedForce, CustomBondForce
-from simtk.openmm.app import Topology
+from rflow.openmm import unit as u
+from rflow.openmm import NonbondedForce, CustomBondForce
+from rflow.openmm.app import Topology
 from rflow.utility import get_force
 
 

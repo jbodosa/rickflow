@@ -11,8 +11,8 @@ import os
 import subprocess
 import pytest
 import numpy as np
-from simtk import unit as u
-from simtk.openmm import LangevinIntegrator, MonteCarloBarostat
+from rflow.openmm import unit as u
+from rflow.openmm import LangevinIntegrator, MonteCarloBarostat
 
 
 @pytest.fixture(scope="module")

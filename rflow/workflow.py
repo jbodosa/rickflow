@@ -1,6 +1,6 @@
 
-from simtk import unit as u
-from simtk.openmm.app import (
+from rflow.openmm import unit as u
+from rflow.openmm.app import (
     CharmmParameterSet, CharmmPsfFile, Simulation, PDBReporter, StateDataReporter
 )
 import mdtraj as md

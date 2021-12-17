@@ -8,7 +8,7 @@ import warnings
 
 import numpy as np
 
-from simtk import unit as u
+from rflow.openmm import unit as u
 
 
 class AlchemyReporter(object):
@@ -124,9 +124,9 @@ class FreeEnergyDifference:
             self.unit_factor = kT.value_in_unit(unit)
 
         # energies and errors between all states; those are in units of kT
-        self.result_matrix = np.zeros([n_lambdas, n_lambdas], dtype=np.float)
-        self.error_matrix = np.zeros([n_lambdas, n_lambdas], dtype=np.float)
-        self.mbar_error_matrix = np.zeros([n_lambdas, n_lambdas], dtype=np.float)
+        self.result_matrix = np.zeros([n_lambdas, n_lambdas], dtype=float)
+        self.error_matrix = np.zeros([n_lambdas, n_lambdas], dtype=float)
+        self.mbar_error_matrix = np.zeros([n_lambdas, n_lambdas], dtype=float)
 
         # parsed from headers
         self.lambdas_vdw = None
@@ -184,7 +184,12 @@ class FreeEnergyDifference:
                 u_kln[k, :, 0:N_k[k]] = u_kln[k, :, indices].T
             # Compute free energy differences and statistical uncertainties
             mbar = MBAR(u_kln, N_k)
-            [DeltaF_ij, dDeltaF_ij, Theta_ij] = mbar.getFreeEnergyDifferences()
+            mbar_output = mbar.getFreeEnergyDifferences()
+            try:
+                DeltaF_ij, dDeltaF_ij, _ = mbar_output
+            except ValueError:
+                DeltaF_ij = mbar_output["Delta_f"]
+                dDeltaF_ij = mbar_output["dDelta_f"]
             return DeltaF_ij, dDeltaF_ij
 
     def _calculate_free_energy_difference(self):

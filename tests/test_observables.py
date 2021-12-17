@@ -6,8 +6,8 @@ import glob
 import numpy as np
 from pytest import approx
 from rflow.observables import *
-from simtk.openmm.app import PME, HBonds
-import simtk.unit as u
+from rflow.openmm.app import PME, HBonds
+import rflow.openmm.unit as u
 
 from rflow import RickFlow, CWD
 from rflow import abspath

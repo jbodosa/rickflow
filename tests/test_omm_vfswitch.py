@@ -2,8 +2,8 @@
 import warnings
 from rflow.rickflow import RickFlow
 from rflow.utility import abspath
-from simtk.openmm import LangevinIntegrator
-from simtk.openmm.app.internal.charmm.exceptions import CharmmPSFWarning
+from rflow.openmm import LangevinIntegrator
+from rflow.openmm import app
 from glob import glob
 import os
 
@@ -12,7 +12,7 @@ def test_vfswitch(tmpdir):
     os.mkdir(str(tmpdir) + "sim1")
     os.mkdir(str(tmpdir) + "sim2")
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=CharmmPSFWarning)
+        warnings.simplefilter("ignore", category=app.internal.charmm.exceptions.CharmmPSFWarning)
         rflow1 = RickFlow(
             toppar=glob(abspath("data/toppar/") +"/*"),
             psf=abspath("data/2dlpc.psf"),
