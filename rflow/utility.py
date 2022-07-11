@@ -134,7 +134,17 @@ def get_platform(gpu_id=None, precision="mixed"):
     if gpu_id is None:
         return None, None
     if isinstance(gpu_id, str):
-        return Platform.getPlatformByName(gpu_id), {}
+        if gpu_id[0] == '0':
+            try:
+                assert "LD_LIBRARY_PATH" in os.environ
+                assert 'cuda' in os.environ["LD_LIBRARY_PATH"].lower()
+                my_platform = Platform.getPlatformByName('CUDA')
+                my_properties = {'DeviceIndex': gpu_id, 'Precision': precision}
+                return my_platform, my_properties
+            except Exception as e:
+                raise NoCuda(e)
+        else:
+            return Platform.getPlatformByName(gpu_id), {}
     elif isinstance(gpu_id, int):
         try:
             assert "LD_LIBRARY_PATH" in os.environ
