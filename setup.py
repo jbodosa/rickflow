@@ -14,7 +14,8 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=6.0', "openmm", "mdtraj", "numpy>=1.13.0", "pandas", "networkx"]
+requirements = ["networkx==2.6.3"]
+#['Click>=6.0', "openmm", "mdtraj", "numpy>=1.13.0", "pandas", "networkx"]
 
 setup_requirements = ['pytest-runner', ]
 
